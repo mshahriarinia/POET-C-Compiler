@@ -1,0 +1,3 @@
+Poet is a framework to parse, compile and optimize the source code of arbitrary programming languages all in an agile manner. The abstractions provide the easy access to all compiling and optimization features of the language being used for. Here we use it to parse, compile and optimzie C code. As part of the graduate course: Compilers class with Dr. Qing Yi at University of Texas at San Antonio 2010-2011
+
+Follow the README in the proj directory to execute the code.
