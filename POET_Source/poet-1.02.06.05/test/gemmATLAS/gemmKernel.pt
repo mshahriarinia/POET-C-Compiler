@@ -1,0 +1,184 @@
+include opt.pi
+
+< parameter mu type=1..MB default=4 message="Unroll and Jam factors for outer loops" />
+< parameter nu type=1..NB default=1 message="Unroll and Jam factors for outer loops" />
+< parameter ku type=1..KB default=KB message="Unroll factor for the innermost loop" />
+< parameter SSELEN type=8|16 default=8 message="The length of SSE registers. Should be 8 for 32 bit machines and 16 for 64 bit machines" />
+< parameter SSENO type=0|8|16 default=8 message="The number of SSE registers. Should be 8 for 32 bit Intel machines and 16 for 64 bit Intel machines" />
+< parameter PF type=0..4 default=1 message="Whether or not to prefetch next block of A, B, C; PF=1: prefetch A only; PF=2: prefetch A and B; PF = 3: prefetch A and C; PF=4: prefetch A, B, C" />
+< parameter threeAddress type=0..1 default=1 message="whether or not translate to three-address code" />
+< parameter permuteReg type=(INT,INT,INT,INT) parse=TUPLE("(" INT "," INT "," INT "," INT ")") default=(1,2,3,4) message="permutation of integers (1,2,3,4) to control the ordering of scalar repl (for A,B,C) and unrollJam (register level blocking); The original ordering is A_scalar->UnrollJam->B_scalar->C_scalar" />
+< parameter permuteUnroll type=(INT,INT) parse=TUPLE("(" INT "," INT ")") default=(1,2) message="permutation of integers (1,2) to control the ordering of FiniteDifferencing and loop unrolling. The original ordering is FiniteDiff -> Unroll" />
+
+<parameter addressTranslate type=0..1 default=0 message="Turn on Three address and two addres translate"/>
+<parameter cleanupUnroll type=0|1 default=1 message="whether to generate cleanup code for loop unrolling"/>
+
+<eval xform_gemm_kernel= ( 
+   DELAY{
+   if (alpha) { <* APPLY Alpha_BufRepl; *>
+       dim = ( CopyArrayDim#("i",0,M,LDA) CopyArrayDim#(L,0,K,1));
+       CopyRepl[init_loc=gemmBody;scalar=0;  elem_type=ftype; trace_decl=gemmDecl]
+          ( "alpha_buf",alphaA, LDA*I+L ,dim, nest3);
+   }
+   }
+
+   <* APPLY Three address translation: Array2Ptr, Abuf_SplitStmt; *>
+   DELAY{
+    if (threeAddress) {
+       ArrayAccess2PtrRef(nest3);
+       if (Arepl)  {
+  	if(addressTranslate == 0)
+		SplitStmt[iReuse=1](Arepl, nest1);
+	else {
+		tempVars = ""; 
+		TRACE(tempVars,SplitStmt[new=TRUE; trace_newVars=tempVars]("",nest1));
+        	PRINT(tempVars);
+        	<<*Arepl = BuildList(tempVars,Arepl);
+		PRINT(Arepl);
+	}
+       }
+       
+       if (SSENO && SSELEN) { <* APPLY body2_Vectorize;  *>
+          if(addressTranslate == 1)
+		vars = ( ((("beta",0) (Arepl,1)), "s") (tempVars,1) (Crepl,0) (Brepl,1));
+          else
+          	vars = ( ((("beta",0) (Arepl,1)), "s") (Crepl,0) (Brepl,1));
+
+	  VectorizeCode[init_vars="beta"; reduce_vars=Crepl; aligned_arrays=(Arepl Brepl); 
+                    elem_prec=pre; iRegno=SSENO; iReglen=SSELEN; 
+                    trace_include=gemmIncl; trace=nest2 ]
+              ( vars, nest1, nest2[Nest.body]) ;
+       }
+     }
+   }
+
+
+   PERMUTE(permuteUnroll, 
+   <* APPLY array_FiniteDiff; *>
+   DELAY{
+     if  (nest1 : Nest) {
+        FiniteDiff[exp_type=("const " ftype "*"); trace_decl=gemmDecl;  
+                   trace=nest3]
+          ( "pA", A, (ExpDim#(nest2,1,LDA) ExpDim#(nest1,1,1)), nest3[Nest.body]);
+        FiniteDiff[exp_type=("const " ftype "*"); trace_decl=gemmDecl]
+          ( "pB", B, (ExpDim#(nest3,1,LDB) ExpDim#(nest1,1,1)), gemmBody);
+     }
+     else {
+        FiniteDiff[exp_type=("const " ftype "*"); 
+                   addi_vars=1; 
+                   trace_decl=gemmDecl; trace=nest3]
+          ( "pA", A, ExpDim#(nest2, 1, LDA), nest3[Nest.body]);
+        FiniteDiff[exp_type=("const " ftype "*"); 
+                   addi_vars=1; trace_decl=gemmDecl]
+          ( "pB", B, ExpDim#(nest3, 1, LDB), gemmBody);
+     }
+     FiniteDiff[ exp_type=(ftype "*"); trace_decl=gemmDecl]
+          ( "pC", C, (ExpDim#(nest3,1,LDC) ExpDim#(nest2,1,1)), gemmBody);
+   }
+
+   <* APPLY nest1_Unroll;  *>
+   DELAY{
+     loopL=nest1[Nest.ctrl];
+     if (ku >= loopL[Loop.step]* 2) {
+        UnrollLoops[factor=(ku/loopL[Loop.step]); trace=nest2 ]
+          (nest1[Nest.body],nest1) ;
+     }
+   }
+  )
+
+   <* APPLY body2_Prefetch; *>
+   DELAY{
+   if (PF > 0) {
+       loopI=nest2[Nest.ctrl]; loopJ=nest3[Nest.ctrl];
+       Prefetch[trace_include=gemmIncl; elem_type="const " ftype "*"; 
+                trace_decl=gemmDecl; trace=gemmBody; var="prefA"] 
+         (A+LDA*KB, (nest3, nest2[Nest.body]), 
+           loopJ[Loop.step]*loopI[Loop.step], gemmBody);
+       if (PF == 2 || PF == 4) {
+          Prefetch[ elem_type="const " ftype "*"; trace_decl=gemmDecl; 
+                trace=gemmBody; var="prefB"] 
+         ( B+LDB, (nest3,nest3[Nest.body]), LDB, gemmBody);
+       }
+       if (PF == 3 || PF == 4) {
+          Prefetch[ elem_type="const " ftype "*"; trace_decl=gemmDecl; 
+                trace=gemmBody; var="prefC"] 
+         ( C+LDC, (nest3,nest3[Nest.body]), LDC, gemmBody);
+       }
+   }
+   }
+
+  )/>
+
+<eval codegen_gemm_kernel=DELAY{ 
+<* assume variables ftype, gemm, gemmIncl, gemmBody, nest3, nest2,nest1 *>
+   if (ku > KB) ku = KB;
+
+   if (! (nest3[Nest.ctrl] : Loop#(CLEAR J,0,CLEAR N,1)))
+      ERROR("unrecognized loop: " nest3[Nest.ctrl]);
+   if (! (nest2[Nest.ctrl] : Loop#(CLEAR I,0,CLEAR M,1)))
+      ERROR("unrecognized loop: " nest2[Nest.ctrl]);
+   if (! (nest1[Nest.ctrl] : Loop#(CLEAR L,0,CLEAR K,1)))
+      ERROR("unrecognized loop: " nest1[Nest.ctrl]);
+
+   ALPHA=1;
+   Aref = DELAY {ArrayAccess#(CLEAR A,I*(CLEAR LDA)+L)};
+   alphaA =  DELAY {(CLEAR ALPHA)*Aref};
+   nest1Body = nest1[Nest.body];
+   if (nest1Body : StmtBlock) nest1Body=nest1Body[StmtBlock.stmts];
+   if (! (nest1Body : 
+          ExpStmt#(Assign#(ArrayAccess#(CLEAR C,J*(CLEAR LDC)+I),
+             ArrayAccess#(C,J*LDC+I) + (alphaA|Aref)
+                         *ArrayAccess#(CLEAR B,J*(CLEAR LDB)+L)))))
+      ERROR("unrecognized stmt: " nest1Body );
+
+   REBUILD(nest1);
+   alphaA =  REBUILD(ALPHA*ArrayAccess#(A,I*LDA+L));
+   Arepl=Brepl=Crepl="";
+
+   APPLY  <* Register blocking *>
+    {
+     PERMUTE(permuteReg, 
+     DELAY 
+       { <* APPLY A_ScalarRepl; *> 
+       loopI=nest2[Nest.ctrl]; loopL=nest1[Nest.ctrl];
+       dim = ( CopyArrayDim#(I,I,loopI[Loop.step],LDA) CopyArrayDim#(L,L,loopL[Loop.step],1));
+       TRACE(Arepl,
+          ScalarRepl[init_loc=nest1[Nest.body]; elem_type=ftype; 
+                 trace_repl=Arepl; trace_decl=gemmDecl; trace=nest2] 
+            ("a_buf",alphaA, dim, nest1[Nest.body]));
+       }
+     DELAY
+       { <* APPLY nest3_UnrollJam; *>
+         if (Crepl == "")
+             UnrollJam[factor=(nu mu);trace=gemmBody] (nest1,nest3); 
+         else PRINT ("Unroll-Jam is disabled because of C_ScalarRepl");
+       }
+    DELAY
+       { <* APPLY B_ScalarRepl; *>
+         loopJ=nest3[Nest.ctrl]; loopL=nest1[Nest.ctrl];
+         dim = ( CopyArrayDim#("j","j",loopJ[Loop.step],LDB) CopyArrayDim#(L,L,loopL[Loop.step],1));
+         TRACE (Brepl,
+            ScalarRepl[init_loc=nest1[Nest.body]; trace_repl=Brepl; elem_type=ftype; 
+                       trace_decl=gemmDecl; trace=nest1]
+                ("b_buf",ArrayAccess#(B,LDB*J+L),dim, nest1[Nest.body]));
+       }
+    DELAY
+       { <* APPLY C_ScalarRepl; *>
+         loopI=nest2[Nest.ctrl]; loopJ=nest3[Nest.ctrl];
+          dim = ( CopyArrayDim#("j","j",loopJ[Loop.step],LDC) CopyArrayDim#("i","i",loopI[Loop.step],1));
+          TRACE (Crepl,
+            ScalarRepl[init_loc=nest2[Nest.body]; save_loc=nest2[Nest.body]; 
+                      trace_repl=Crepl; elem_type=ftype; trace_decl=gemmDecl; trace=nest2]
+           ("c_buf",ArrayAccess#(C,J*LDC+I), dim, nest2[Nest.body]));
+       }
+     )
+    };
+   <* APPLY(xform_gemm_kernel); *>
+   for ((i = 0; opt = xform_gemm_kernel); opt != ""; (opt = cdr opt; i=i+1)) {
+         APPLY { (car opt) }; 
+   }
+   if (cleanupUnroll)
+       CleanupBlockedNests[only=UnrollLoopCheck](gemmBody);
+   gemm
+} />
+

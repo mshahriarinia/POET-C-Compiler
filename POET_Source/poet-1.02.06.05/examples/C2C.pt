@@ -1,0 +1,6 @@
+<parameter inputFile type=STRING default="" message="input file name" />
+<parameter outputFile type=STRING default="" message="output file name" />
+
+<input from=inputFile syntax="Cfront.code" to=inputCode/>
+<* You can add transformations to the inputCode here *>
+<output to=outputFile syntax="Cfront.code" from=inputCode/>

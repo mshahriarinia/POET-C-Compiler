@@ -1,0 +1,297 @@
+
+
+17. one production per rule:
+
+ExprAdditive -> ExprMultiplicative ExprAdditive_
+ExprAdditive_ -> ExprAdditive_sum | ExprAdditive_sub | ""
+ExprAdditive_sum -> + ExprMultiplicative ExprAdditive_
+ExprAdditive_sub -> - ExprMultiplicative ExprAdditive_
+
+ExprMultiplicative -> term ExprMultiplicative_
+ExprMultiplicative_ -> ExprMultiplicative_mul | ExprMultiplicative_div | ""
+ExprMultiplicative_mul -> * term ExprMultiplicative_ 
+ExprMultiplicative_div -> / term ExprMultiplicative_
+
+
+
+16. revise add, remove left Recursion
+
+ExprAdditive -> ExprMultiplicative ExprAdditive_
+ExprAdditive_ -> + ExprMultiplicative ExprAdditive_ | - ExprMultiplicative ExprAdditive_ | ""
+
+ExprMultiplicative -> term ExprMultiplicative_
+ExprMultiplicative_ -> * term ExprMultiplicative_ |  / term ExprMultiplicative_ | ""
+
+-------------------------------
+
+15. revise add
+
+ExprAdditive -> ExprAdditive + ExprMultiplicative | ExprAdditive - ExprMultiplicative | ExprMultiplicative
+
+ExprMultiplicative -> ExprMultiplicative * term | ExprMultiplicative / term | term
+
+
+ExprTimes ExprAdd
+
+ExprAdd -> ExprAdd_Sum | ""
+
+ExprAdd_Sum -> + ExprBinary ExprAdd 
+
+
+=================
+
+
+
+
+14. Type Checking, (in the .pt file)
+--define Expr traverse function.
+
+Expr. 
+
+-------------------------------
+
+13. Unary Expression
+
+UnaryExpr -> UnaryOperator Term
+
+UnaryOperator -> ! | -
+
+-------------------------------
+
+12. rename
+
+ConditionalExpr -> LogicalOrExpr
+
+LogicalOrExpr -> LogicalAndExpr LogicalOrExpr_
+LogicalOrExpr_ -> LogicalOrExpr_1 | ""
+LogicalOrExpr_1 -> || LogicalAndExpr LogicalOrExpr_
+
+LogicalAndExpr -> EqualityExpr LogicalAndExpr_
+LogicalAndExpr_ -> LogicalAndExpr_1 | ""
+LogicalAndExpr_1 -> && EqualityExpr LogicalAndExpr_
+
+EqualityExpr -> ExprBinary | EqualityExpr1
+EqualityExpr1 -> ExprBinary EqualityOperator ExprBinary
+
+EqualityOperator -> == | != | > | >= | < | <= 
+
+-------------------------------
+
+11. remove left recursion
+
+ConditionalExpr -> LogicalOrExpr
+
+LogicalOrExpr -> LogicalAndExpr LogicalOrExpr_
+LogicalOrExpr_ -> || LogicalAndExpr LogicalOrExpr_ | ""
+
+LogicalAndExpr -> EqualityExpr LogicalAndExpr_
+LogicalAndExpr_ -> && EqualityExpr LogicalAndExpr_ | ""
+
+EqualityExpr -> ExprBinary | EqualityExpr1
+EqualityExpr1 -> ExprBinary EqualityOperator ExprBinary
+
+<<<<<<EqualityExpr -> ExprBinary | PossibleEquality
+<<<<<<PossibleEquality -> EqualityOperator ExprBinary | ""
+
+EqualityOperator -> == | != | > | >= | < | <= 
+
+
+-------------------------------------
+
+10. conditional
+
+ConditionalExpr -> LogicalOrExpr
+
+LogicalOrExpr -> LogicalAndExpr | LogicalOrExpr || LogicalAndExpr
+
+LogicalAndExpr -> EqualityExpr | LogicalAndExpr && EqualityExpr
+
+EqualityExpr -> ExprBinary  | ExprBinary EqualityOperator ExprBinary
+
+EqualityOperator -> == | != | > | >= | < | <= 
+
+---------------------------------------
+
+9. literal 
+
+ArrayId -> Id IndexList
+
+
+ArrayLiteral -> ID
+
+IndexList ->  indexList1 | ""
+IndexList1 -> index indexList 
+
+---------------------------------------
+
+8. While
+
+WhileStmt -> while ( expr ) Stmt
+
+---------------------------------------
+
+7.1 rename multiple rules
+
+BlockedStmts -> { Stmts }
+
+IfStmt -> IfStmt1 | IfStmt2
+IfStmt1 -> if ( Expr ) StmtOrBlockedStmts
+IfStmt2 -> if ( Expr ) StmtOrBlockedStmts else StmtOrBlockedStmts
+ 
+
+StmtOrBlockedStmts -> Stmt | BlockedStmts
+
+---------------------------------------
+
+7. BlockedStmts, IfStmt
+
+BlockedStmts -> { Stmts }
+
+IfStmt -> if ( Expr ) StmtOrBlockedStmts | if ( Expr ) StmtOrBlockedStmts else StmtOrBlockedStmts
+
+StmtOrBlockedStmts -> Stmt | BlockedStmts
+
+---------------------------------------
+
+6.1 rename multiple rules, 
+
+Assignment -> ID = Expr
+
+DeclaratorIdAssignmentList -> DeclaratorIdAssignmentList1 | DeclaratorIdAssignmentList2 | ""
+DeclaratorIdAssignmentList1 -> ID , DeclaratorIdAssignmentList 
+DeclaratorIdAssignmentList2 -> Assignment , DeclaratorIdAssignmentList
+
+Declarator -> type DeclaratorIdAssignmentList
+Type -> int | float
+
+---------------------------------------
+
+6. assignment, declaration list
+
+Assignment -> ID = EXPR
+
+DeclaratorIdAssgnmentList -> ID , DeclaratorIdAssgnmentList | Assignment , DeclaratorIdAssgnmentList | ""
+Declarator -> type idAssgnList
+Type -> int | float
+
+
+
+---------------------------------------
+---------------------------------------
+---------------------------------------
+---------------------------------------
+
+5.2 add parenthesis 2+(3-5)-(2+4);
+
+
+expr -> (expr) | expBinary
+
+exprBinary -> exprBinary + exprBinary | exprBinary - exprBinary | term
+
+term ->  INT | ID | (expr)
+
+--------------------
+
+
+5.1 
+
+expr -> (expr) | expBinary
+
+exprBinary -> term exprBinary_ 
+exprBinary_ -> + exprBinary exprBinary_ | - exprBinary exprBinary_ | ""
+
+term ->  INT | ID 
+
+
+---------------------------------------------
+
+5. trying to remove code and get something running, remove exprMul and expr Unary
+
+expr -> (expr) | expBinary
+
+exprBinary -> exprBinary + exprBinary | exprBinary - exprBinary | term
+
+term ->  INT | ID | 
+
+---------------------------------------------
+
+
+/*4. (3. rename multiple rules, Capitalize, Times)
+Expr -> Expr1Parenthesis | ExprBinary
+Expr1Parenthesis -> (expr)
+
+ExprBinary ->  ExprTimes ExprBinary_
+ExprBinary_ -> ExprBinary_1Add | ExprBinary_1Sub | ""
+ExprBinary_1Add -> + ExprBinary ExprBinary_
+ExprBinary_1Sub -> - ExprBinary ExprBinary_
+
+ExprTimes -> ExprUnary ExprTimes_
+ExprTimes_ -> ExpTimes_Mul | ExprTimes_Div | ""
+ExprTimes_Mul -> * ExprTimes ExprTimes_
+ExprTimes_Div -> / ExprTimes ExprTimes_
+
+ExprUnary -> ExprUnary1Positive | ExprUnary1Negative | ExprUnary1Negate | Term
+ExprUnary1Positive -> +ExprUnary
+ExprUnary1Negative -> -ExprUnary
+ExprUnary1Negate -> !ExprUnary
+
+Term ->  INT | ID 
+*/
+---------------------------------------------
+
+
+3. (2. remove lef recursion)
+expr -> (expr) | expBinary
+
+exprBinary ->  exprMul exprBinary_
+exprBinary_ -> + exprBinary exprBinary_ | - exprBinary exprBinary_ | ""
+
+exprMul -> exprUnary exprMul_
+exprMul_ -> * exprMul exprMul_ | / exprMul exprMul_ | ""
+
+exprUnary -> +exprUnary | -exprUnary | !expUnary | term
+
+term ->  INT | ID 
+
+
+
+---------------------------------------------
+
+
+2. (1. remove extra non-terminals and remove nested recursion)
+expr -> (expr) | expBinary
+
+exprBinary -> exprBinary + exprBinary | exprBinary - exprBinary | exprMul
+
+exprMul -> exprMul * exprMul | exprMul / exprMul | exprUnary
+
+exprUnary -> +exprUnary | -exprUnary | !expUnary | term
+
+term ->  INT | ID 
+
+
+---------------------------------------------
+
+
+1.
+expr -> (expr) | INT | ID | expBinary
+
+exprBinary -> exprAdd | exprSub | exprMul
+exprAdd -> expr + expr
+exprSub -> expr - expr
+
+exorMul -> exprTimes | exprDiv | exprUnary
+exprTimes -> expr * expr
+exprDiv -> expr / expr
+
+
+exprUnary -> exprPositive | exprNegative | expr
+exprPositive -> +exprUnary
+exprNegative -> -exprUnary
+exprNot -> !expUnary
+
+
+
+
+
+

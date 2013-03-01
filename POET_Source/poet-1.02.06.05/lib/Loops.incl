@@ -1,0 +1,238 @@
+include utils.incl
+include ExpStmt.incl
+
+<*
+   POET : Parameterized Optimizations for Empirical Tuning
+   Copyright (c)  2008,  Qing Yi.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ 1. Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+ 3. Neither the name of UTSA nor the names of its contributors may be used to
+    endorse or promote products derived from this software without specific
+    prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISEDOF THE POSSIBILITY OF SUCH DAMAGE.
+*>
+
+<*******************************************************************
+  code templates and parsing/rebuild functions for loops and nests
+********************************************************************>
+
+<xform BuildNest annot="" />
+<code Nest pars=(ctrl, body) annot="" rebuild=(BuildNest[annot=annot](ctrl,body))/>
+<code Loop pars=(i,start,stop,step)  maxiternum="" />
+<code Assign/>
+<code ExpStmt/>
+<code If pars=(condition) />
+
+<* A single-trip loop *>
+<code DummyLoop pars=(ivar,start,stop,step) >
+@(start < stop)? "" : If#(Bop#("<",start,stop)) @
+</code>
+
+<* A single-trip loop *>
+<code LoopBound pars=(ivar,start,stop,step)  
+        rebuild=((start=="" && stop=="")?"":LoopBound#(ivar,start,stop,step)) >
+@cond=(start=="")? "" : (Bop#(">=",ivar,start));
+ if (stop != "") { 
+    if (cond=="") cond=Bop#("<",ivar,stop);
+    else cond=Bop#("&&",cond,Bop#("<",ivar,stop));
+  }
+If#cond@
+</code>
+
+<************* Markers of AST ******************************>
+<*** AST Markers in general should not appear in a regular code 
+     as they should have been processed by various cleanup opt. ***>
+<*marker for unrolling a loop nest *>
+<code UnrollLoop pars = (ivar, start, plus, step, ur)/>
+
+<* Marker for the stopping end of inner loop unrolling *> 
+<code UnrollLoopTileEnd pars=(bloop, ur : INT)/>
+
+
+<* Marker for different iterations of the unrolled loop body *>
+<code UnrollLoopCheck pars=(bloop, i, incr, inside) />
+
+
+<* union a list of loops into a single one*> 
+<xform UnionLoops pars=(loops)>
+res="";
+for (p = loops; (cur=car(p)) != ""; p = cdr(p)) {
+  if (res=="") res = cur;
+  else if (res != cur) {
+     if (res : Loop#(i,lb,ub,step)) loop=Loop;
+     else if (res : LoopBound#(i,lb,ub,step)) loop=LoopBound;
+     if (! ((cur : Loop#(i1,lb1,ub1,step1)) || (cur : LoopBound#(i1,lb1,ub1,step1))))  ERROR("unknown loop: " cur);
+     if (i == "") i = i1;
+     if (step == "") step=step1;
+     if (step != step1 && step1!="") ERROR("Cannot union loops with different steps");
+     if (step < 0) { min=CODE.MAX; max = CODE.MIN; }
+     else {min=CODE.MIN; max=CODE.MAX; }
+     res = REBUILD(loop#(i,RebuildBop(min,lb,lb1),RebuildBop(max,ub,ub1),step)); 
+  }
+}
+res
+</xform>
+
+
+<*************** Finding things in Nests *************>
+
+<xform FindStmtsOutsideNest pars=(nest, input)>
+res = "";
+foreach (input : (cur = (nest|ExpStmt)) : TRUE)
+{
+  if (cur != nest)  
+       res = BuildList(cur,res);
+}
+ReverseList(res)
+</xform>
+
+<xform FindLoopsInNest pars=(input, inner)>
+ (input : inner)? ""
+ : (input : Nest#(loop,body))?   (
+     r = FindLoopsInNest(body, inner);
+     (r == "")? loop : (loop::r)
+  )
+ : ( <*PRINT("fail to find loop in " input);*> "" )
+</xform>
+
+<xform MapLoopsInNest pars=(input, map)>
+ foreach (input : (cur=Nest#((CLEAR loop),_)): FALSE) {
+   if (map[loop]=="")
+       map[loop] = cur;
+ }
+</xform>
+
+<***********Rebuild Loop Nests*********************>
+
+<<* rebuild a loop/if-then/Unroll nest; skip empty controls;
+<<*     the entire nest becomes empty string if body is empty setring
+<<*     convert a list of loop/if-then/Unroll controls to a nest
+<code NestApp pars=(loop, append) />
+
+<xform BuildNest pars=(loops,body) trace=""  annot1="" annot="">
+  if (body == "")  RETURN "";
+switch (loops) {
+case "":   REPLACE(trace,body,trace) 
+case If#TRUE: REPLACE(trace,body,trace)
+case If#FALSE: ""
+case (first rest):  
+   BuildNest(first, BuildNest[annot="";trace=((trace:Nest#(_,t1))?t1:"")](rest, body))
+case UnrollLoop#(i, start, plus, step, ur) : 
+       if (ur : UnrollLoopTileEnd#(bloop,new_ur)) ur = new_ur;
+       else {
+           bloop="";
+           if (! (ur : INT)) ERROR("Expecting an integer but get: " ur);
+       }
+       for ( (repl = ""; j = ur-1 ); j >= 0; j = j - 1 ) { 
+           repl = BuildList(RebuildExp(Bop#(plus,start,j*step)),repl); 
+        }
+       stmt = DUPLICATE(i, repl,   body);
+       if (bloop != "")  {
+          p_stmt = cdr stmt; stmt = (car stmt) :: "";
+          for ( p_i=1 ; p_i < ur; (p_i+=1; p_stmt=cdr p_stmt)) 
+          {
+             cur = (p_i == ur-1)? p_stmt : (car p_stmt); 
+             stmt = BuildList(Nest[annot=annot]#(UnrollLoopCheck#(bloop,p_i*step,step,1),cur),stmt); 
+          }
+          stmt=ReverseList(stmt);
+       }
+       stmt = REBUILD(stmt)
+case NestApp#(curloop,app):  Nest[annot=annot]#(curloop, body)::app 
+case DummyLoop#(_,start,stop,step):
+       (stop <= start)? "" : Nest[annot=annot]#(loops,body)
+case Loop#(i,start,stop,step):
+     if (start == stop) { ExpStmt#(Assign#(i,start)) }
+     else if (stop : INT && start : INT && step : INT)
+         {
+          if (start + step >= stop && start < stop) 
+           {
+              nloop = DummyLoop#(i,start,stop,step);
+              nbody = REPLACE(loops, nloop, body);
+              nbody = REPLACE(i,start,nbody); 
+              if (i : STRING|Name)
+                 nbody = nbody::ExpStmt#(Assign#(i,start+step));
+              Nest[annot=annot]#(nloop,nbody)
+           }
+          else { Nest[annot=annot]#(loops,body) }
+        }
+     else { 
+     texp = Bop#("+", start, step); 
+     exp = Bop#("-", texp, stop);
+     exp = REBUILD(exp);
+      if(exp : INT && exp >=0) {
+              nloop = DummyLoop#(i,start,stop,step);
+              nbody = REPLACE(loops, nloop, body);
+              nbody = REPLACE(i,start,nbody); 
+              if (i : STRING|Name)
+                 nbody = nbody::ExpStmt#(Assign#(i,texp));
+          Nest[annot=annot]#(nloop,nbody)
+      } 
+      else Nest[annot=annot]#(loops,body); 
+     
+     }
+default:  Nest[annot=annot]#(loops,body)
+}
+</xform>
+
+<xform TraceNest pars=(input, tNests) nonPerfect=0 loop_only=1 >
+   if (tNests == "" && !(tNests : VAR)) RETURN input;
+   if (!(input : Nest#(loop,input1))) {
+      if (!nonPerfect) 
+         ERROR("Input must be a loop nest but is: \n" input);
+      for (p_input = input; p_input != ""; p_input=cdr p_input) {
+         cur = car(p_input);
+         if (cur : Nest#(loop, input1)) { input = cur; BREAK; }
+      }
+      if (p_input == "")
+         ERROR("Cannot find a loop nest in Input: \n" input);
+   }
+   if (loop_only && !(loop : Loop|LoopBound)) 
+       TraceNest(input1, tNests); 
+   else {
+       cur = tNests;
+       if (! (cur : VAR))
+       {
+           cur = car cur;
+           tNests = cdr tNests;
+       }
+       else tNests="";
+       REPLACE(cur, input, cur);
+       TraceNest(input1, tNests);
+    }
+</xform>
+
+<***********************************************>
+<xform TraceNonPerfectSplit pars=(nest, nonPerfect, traceSplits) >
+ if (nonPerfect=="") RETURN "";
+ switch (nest) {
+ case Nest#(_, body) :  TraceNonPerfectSplit(body, nonPerfect, traceSplits)
+ case (first rest) :
+      curTrace = car traceSplits; 
+      if (curTrace == "") ERROR("No trace handle for :" first);
+      result = first; target=car(nonPerfect); 
+      for (p_rest = rest; p_rest != ""; p_rest=cdr p_rest)  {
+        if (car(p_rest) == target) BREAK;
+        result = (car p_rest) :: result;   
+      }
+      if (p_rest == "") ERROR("Did not find the non-perfect nest: " nest);
+      result = ReverseList(result);
+      REPLACE( curTrace, result, curTrace); 
+      TraceNonPerfectSplit(target, cdr(nonPerfect), cdr traceSplits)
+ }
+</xform>

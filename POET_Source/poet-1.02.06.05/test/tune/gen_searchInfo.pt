@@ -1,0 +1,9 @@
+
+<parameter inputFile message="input file name"/>
+<parameter outputFile  message="output file name"/>
+<parameter outputSyntax default="search_spec.code" message="output syntax file name"/>
+
+<input from=(inputFile) syntax="auto_poet.code" to=inputCode/>
+
+<code CommandList/>
+<output to=(outputFile) syntax=outputSyntax from=(CommandList#inputCode)/>

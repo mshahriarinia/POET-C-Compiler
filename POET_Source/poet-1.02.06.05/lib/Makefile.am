@@ -1,0 +1,11 @@
+files = omp.incl opt.pi opt.pt utils.incl ExpStmt.incl Loops.incl Cfront.code Ffront.code C2F.code TranslatorDriver.pt
+EXTRA_DIST = $(files)
+
+install-data-hook:
+	test -e $(DESTDIR)$(libdir) || mkdir $(DESTDIR)$(libdir);
+	for each in $(files); do cp $(srcdir)/$${each} $(DESTDIR)$(libdir); done
+
+uninstall-hook:
+	for each in $(files); do chmod 644 $(DESTDIR)$(libdir)/$${each}; rm $(DESTDIR)$(libdir)/$${each}; done
+
+include ../Make.inc

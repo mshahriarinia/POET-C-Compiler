@@ -1,0 +1,9 @@
+<parameter name=pthread_nest1 loopnest=nest1 opt=ParallelizeLoop config=NumOfThreads default=1 />
+<parameter name=psize_nest1 loopnest=nest1 opt=ParallelizeLoop config=BlockFactor default=256 />
+<parameter name=bsize_nest1 loopnest=nest1 opt=BlockLoops config=BlockFactor dim=2 default=16,16 />
+<parameter name=copy1_config_X loopnest=nest1 opt=CopyArray config=switch arrayName=X enum=0,1,2 default=1 />
+<parameter name=copy2_config_Y loopnest=nest1 opt=CopyArray config=switch arrayName=Y enum=0,1,2 default=1 />
+<parameter name=ujsize_nest1 loopnest=nest1 opt=UnrollJam config=UnrollJamFactor dim=1 default=2 />
+<parameter name=scalar1_config_X loopnest=nest1 opt=ScalarRepl config=switch arrayName=X enum=0,1,2 default=1 />
+<parameter name=scalar2_config_Y loopnest=nest1 opt=ScalarRepl config=switch arrayName=Y enum=0,1,2 default=1 />
+<parameter name=usize_nest2 loopnest=nest2 opt=UnrollLoops config=UnrollFactor dim=1 default=4 />

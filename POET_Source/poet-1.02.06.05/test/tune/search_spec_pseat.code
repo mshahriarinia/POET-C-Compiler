@@ -1,0 +1,43 @@
+include utils.incl
+
+<**
+ *  Provided by Apan Qasem, 7/2010.
+ *>
+
+<define PARSE CODE.CommandList/>
+
+<code CommandList parse=LIST(ParamDecl|_, "\n")/>
+
+<code IntList parse=LIST(INT," ")/>
+
+<code ParamDecl pars=(param)>
+@param@
+</code>
+
+<code NumOfThreads pars=(parName:Name,loopNest:Name, defval:INT)>
+1 @parName@ N 1 16 1 @defval@
+</code>
+
+<code ParBlockFactor pars=(parName:Name, loopNest:Name, defval:IntList) >
+1 @parName@ N 16 256 8 @defval@
+</code>
+
+<code BlockFactor pars=(parName:Name, loopNest:Name, dim:INT, defval:IntList)>
+@dim@ @parName@ N 8 128 8 @defval@
+</code>
+
+<code UnrollJamFactor pars=(parName:Name, loopNest:Name, dim:INT, defval:IntList)>
+@dim@ @parName@ N 2 16 1 @defval@
+</code>
+
+<code UnrollFactor pars=(parName:Name, loopNest:Name, defval:INT)>
+1 @parName@ N 1 32 1 @defval@
+</code>
+
+<code CopyArrayConfig pars=(parName:Name, loopNest:Name, arrayName:Name, defval:INT)>
+1 @parName@ E 3 0 1 2  @defval@
+</code>
+
+<code ScalarReplConfig pars=(parName:Name, loopNest:Name, arrayName:Name, defval:INT)>
+1 @parName@ E 3 0 1 2 @defval@
+</code>

@@ -1,0 +1,2964 @@
+\documentclass[11pt]{book}
+\usepackage{makeidx}
+\usepackage{appendix}
+\usepackage{ifthen}
+\usepackage{listings}
+\usepackage{verbatim}
+\usepackage[dvips,pdfpagemode=UseOutlines,bookmarks,bookmarksopen,
+pdfstartview=FitH,colorlinks,linkcolor=blue,
+pdftitle={POET Language Manual},
+pdfauthor={Qing Yi},
+citecolor=blue,urlcolor=red]{hyperref}
+\textwidth 6.5in
+\textheight  8.8in
+\oddsidemargin  0in
+\evensidemargin 0in
+\topmargin      -0.3in
+\parindent      0.25in
+
+%\def\bs{\char'134 } % backslash in \tt font.
+%\newcommand{\ie}{i.\,e.,}
+%\newcommand{\eg}{e.\,g..}
+%\DeclareRobustCommand\cs[1]{\texttt{\char`\\#1}}
+\makeindex 
+
+\title{POET Reference Manual}
+\author{ Qing Yi \\
+  University of Texas At San Antonio \\(qingyi@cs.utsa.edu) }
+
+\begin{document}
+
+\maketitle
+
+{\bf \Large \center Front Matter}
+
+POET is an interpreted program transformation language designed to apply  
+source-to-source transformations to programs written in 
+languages such as C, C++, Java and domain-specific ad-hoc languages such
+as an interface specification language.
+The POET language has been extensively used for the purpose of  
+applying parameterized program optimizations to improve the performance
+(i.e., the runtime speed) of C programs in the context of empirical performance
+tuning, where the runtime performance of different program implementations
+are experimented and the feedback is used to guide further optimizations.
+The use of POET, 
+however, is not limited to program optimizations. 
+You can use POET
+to easily process any structured input, extract information from 
+or apply transformations to the input,  and then output the result. 
+% If you are a new user of the POET language,
+%please send us a brief description of your project and what roles
+%POET has played in your project. We appreciate your input and any
+%feedback you may have in the design and implementation of POET.
+
+The POET language was designed and implemented by Dr. Qing Yi
+at the University of Texas at San Antonio.
+Please directed all questions and feedbacks to her at 
+qingyi@cs.utsa.edu. 
+
+\vspace{.2in}
+Qing Yi 
+
+6/15/2009
+
+%The current release of POET includes five directories: src, lib, doc, test, and examples.
+%The $src$ directory contains C/C++/Yacc/Lex code for the POET language interpreter;
+%the $lib$ directory contains the existing POET libraries that include an extensive collection
+%of language descriptions and program xform routines useful both for software
+%optimization and evolution;
+%the $doc$ directory contains documentations about the POET language;
+%the $test$  directory contains some example applications of
+%the POET code; and the $examples$ directory contains some stand-alone POET
+%code that serve as examples in POET tutorials. 
+
+
+\begin {center}
+ {Copyright (c)  2008,  Qing Yi.  All rights reserved.}\\
+Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
+\begin {enumerate}
+\item Redistributions of source code must retain the above copyright notice, this list of conditions and the following disclaimer.
+\item Redistributions in binary form must reproduce the above copyright notice, this list of conditions and the following disclaimer in the documentation and/or other materials provided with the distribution.
+\item Neither the name of UTSA nor the names of its contributors may be used to endorse or promote products derived from this software without specific prior written permission.
+\end {enumerate}
+\end {center}
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+\addcontentsline{toc}{section}{Table Of Content}
+\tableofcontents
+
+%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter{Building and Using POET}
+%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Building POET From Distribution}
+After downloading a POET distribution, say poet-1.02.06.tar.gz, you can build POET
+using the following commands.
+\begin {verbatim} 
+> tar -zxf poet-1.02.06.tar.gz 
+> cd poet-1.02.06
+> ./configure --prefix=<your install directory>
+>  make     (make and then run the POET interpreter on a few tests)
+> make check (test whether the POET interpreter works correctly)
+> make install (install POET interpreter and libraries on your local machine)
+\end {verbatim}
+
+\section{Building POET From CVS}
+If you are a developer of POET and have access to the POET CVS repository, you can build POET using the following commands.
+\begin {verbatim}
+> cvs co POET
+> cd POET
+> aclocal
+> automake -a
+> autoconf
+> ./configure
+>  make     (make and then run the POET interpreter on a few tests)
+> make check (test whether the POET interpreter works correctly)
+\end {verbatim}
+
+\section {Directory Structure of POET Source Distribution}
+The POET interpreter is implemented in C++.
+The distribution of POET includes the following sub-directories.
+\begin {itemize}
+\item The $src$ directory, which contains the C/C++/YACC/LEX code used to implement POET.
+\item The $lib$ directory, which contains a variety of  code templates and xform routines implemented using POET.
+\item The $test$ directory, which contains some POET scripts used to test the correctness of the POET install.
+\item The $example$ directory, which contains examples used in various POET tutorials.
+\item The $doc$ directory which contains the manual and tutorials for POET.
+\end {itemize}
+
+\section{Using POET}
+\label {sec-usePOET}
+The main components of the POET implementation include the language interpreter, named $pcg$,
+and a library of POET code templates and xform routines for various purposes. 
+After running {\it make install}, the binary interpreter $pcg$ is copied to directory $<$your install directory$>$/$bin$,
+and the POET libraries are copied to $<$your install directory$>$/$lib$. 
+The command line options for running $pcg$ are as follows.
+\begin {verbatim}
+Usage: pcg [-hv] {-dp[xp]} {-L<dir>} {-p<name>=<val>} <poet_file1> ... <poet_filen>
+options:
+     -h:      print out help info
+     -v:      print out version info
+     -L<dir>: search for POET libraries in the specified directory
+     -p<name>=<val>: set POET parameter <name> to have value <val>
+     -dp: print out debugging info. for parsing
+     -dx: print out debugging info. for xform routine invocations
+     -md: allow code template syntax to be multiply defined (overwritten)
+\end {verbatim}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter {Building Translators: Getting Started}
+\label {chap-examples}
+This chapter goes over some  example POET translators in the POET/examples directory.
+\newcounter {note}
+\newcommand {\note} {\addtocounter{note}{1} \vspace{2mm} \noindent {\bf NOTE\thenote}: }
+\section {Hello World}
+The following simple POET program (POET/exampls/helloworld.pt) prints out the string ``hello world" to standard output.
+\begin {verbatim}
+<************* Hello World Script *********>
+<output from="hello world"/>
+\end {verbatim}
+
+\note All POET comments are either enclosed inside a pair of $<$* and *$>$, or from $<$$<$* until the end of
+the current line. 
+Specifically, all strings enclosed within $<*$ and $*>$ will be ignored by the POET interpreter,
+and all strings following $<<*$ until the end of line will be ignored.
+
+\section{The Identity Translator}
+\label {sec-identity-translator}
+
+First and foremost, POET is designed to build translators. The easiest kind of translator
+is an identity translator, which reads the input code from an arbitrary file, does nothing, and then writes the input code to a different file. The following POET code (POET/examples/IdentityTranslator.pt) does exactly this.
+\begin {verbatim}
+<********** The Identity Translator ****************>
+<parameter inputFile default="" message="input file name" />
+<parameter outputFile default="" message="output file name" />
+
+<input from=inputFile annot=0 to=inputCode/>
+<output to=outputFile from=inputCode/>
+<********** The Identity Translator ****************>
+\end {verbatim}
+
+\note 
+Each {\it parameter} declaration  declares a global 
+variable whose value can be modified via command-line options. 
+For example, the identity translator can be invoked using the following command. \\
+{\it $>$ pcg -pinputFile=myFile1 -poutputFile=myFile2 IdentityTranslator.pt }\\
+The command-line options are optional as long as a default value (declared using the $default$ keyward) is given for each parameter. 
+
+\note
+Each {\it input} command opens a list of  input files and saves the content of the files as the content of 
+a global variable (here the $inputCode$ variable). The  $annot=0$ specification ensures that 
+the input files will be read as a sequence of integer/string tokens and all annotations in the file will be ignored.
+%otherwise, the input code is parsed based on the grammar definition contained in file $inputLang$ (enforced by the $syntax=inputLang$ specification), and if the input code contains POET annotations,
+%the annotations will be used to help the parsing process.\note The {\em syntax} attribute in the $input$ and $output$ commands specifies what language syntax 
+to use when parsing/unparsing the input/output code. 
+
+
+\note
+%Each $output$ command similarly has a $cond$ specification which enforces that the first $output$
+%command is evaluated only when
+%$inputLang$ is empty (no language syntax is defined for the input code), and the second $output$
+%command is evaluated only when $inputLang$ is not empty (a language syntax file is specified).
+Each $output$ command opens an external file and then outputs the content of  an expression 
+ into the external file. 
+%If $inputLang == ""$, the input code will be output as a sequence of integer/string
+%tokens;
+%otherwise, the input code is unparsed based on the grammar definition contained in file $inputLang$ (enforced by the $syntax=inputLang$ specification).
+
+\note When the input file name is an empty string, the $input$ command will read from
+the standard input (the user will be prompted to type in the input); when the output file name is
+an empty string, the $output$ command will write to the standard output (the screen).
+
+%as illustrated by the $inputCode$ variable, variables in POET can be used without being declared.  
+%%%%%%%%%%%%%%%%%%
+\section{The String Translator}
+\label {sec-string-translator}
+
+In general, after reading some input files, we would like to apply some transformation and then
+output the transformed code. The following POET program (POET/examples/StringTranslator.pt) 
+serves to substitute a pre-defined set of strings with other strings.
+\begin {verbatim}
+<********** The String Translator ****************>
+<parameter inputFile default="" message="input file name" />
+<parameter outputFile default="" message="output file name" />
+<parameter inputString type=(STRING...) default="" message="string to replace" />
+<parameter outputString type=(STRING...) default="" message="string to replace with" />
+
+<input from=inputFile annot=0 to=inputCode/>
+
+<eval 
+return = inputCode;
+for ((p_input = inputString,p_output=outputString); p_input != "";
+      (p_input = TAIL(p_input); p_output=TAIL(p_output)))
+   { return = REPLACE(HEAD(p_input), HEAD(p_output), return);}
+/>
+
+<output to=outputFile from=return/>
+\end {verbatim}
+\note  The $type$ attribute within a parameter declaration ensures that only a value of proper type
+can be assigned to the parameter. In particular,  the type $(STRING...)$ specifies a list of strings.
+
+\note The $eval$ command is used to evaluate expressions and statements at the global scope.
+All POET expressions must be embedded within an eval command to be evaluated at the
+global scope.
+
+\note POET supports assignment statements and for loops in a similar fashion as the C language.
+Because POET is dynamically typed, variables in POET do not need to be declared.
+
+\note The HEAD and TAIL keywords are operators that extract values from a list (see section~\ref {sec-op-list}). Specifically, $HEAD$ returns the first element in the list,
+$TAIL$ returns the tail of elements in the list (excluding the first one). 
+If the operand $list$ is actually a single value, then 
+$HEAD(list)$ returns the single value, and $TAIL(list)$ returns the empty string (``").
+
+\note The REPLACE keyword is a built-in operator for systematically applying transformations (replacements) to an input expression.
+
+\paragraph{Transformation Logic:} The example loop first initializes two variables, $p\_input$ and $p\_output$,
+with the values of global variables $inputString$ and $outputString$ respectively (each variable
+has a list of strings as content). 
+It then examines whether $p\_input$ is an empty string. As long as $p\_input$ is not empty,
+the body of the $for$ loop is evaluated, which modifies the value of the $return$ variable by 
+invoking the built-in $REPLACE$ operator.
+Each time the $REPLACE$ operator is invoked, it replaces all the occurrences of $HEAD(p\_input)$
+with $HEAD(p\_output)$ in the input code contained in the $return$ variable, where $HEAD(\_input)$
+and $HEAD(p\_output)$ returns the first string contained $p\_input$ and $p\_output$ respectively.
+At the end of each iteration, both $p\_input$ and $p\_output$ are modified with the $TAIL$
+of their original values. 
+
+%%%%%%%%%%%%%%%%%%
+\section{Language Translators}
+\label {sec-lang-driver}
+%%%%%%%%%%%%%%%%%
+
+Instead of reading an input file as a sequence of strings, we frequently need to discover the syntactical 
+structure of the input file. This is called parsing. For example, the following translators (POET/examples/C2C.pt and C2F.pt) reads and parses the syntax of  a C program, and then unparses the code to an external file
+in either C syntax or Fortran syntax.
+
+\begin {verbatim}
+<*************** C to C Translator *************>
+<parameter inputFile type=STRING default="" message="input file name" />
+<parameter outputFile type=STRING default="" message="output file name" />
+
+<input from=inputFile syntax="Cfront.code" to=inputCode/>
+<* You can add transformations to the inputCode here *>
+<output to=outputFile syntax="Cfront.code" from=inputCode/>
+\end {verbatim}
+
+\begin {verbatim}
+<*************** C to Fortran Translator *************>
+<parameter inputFile type=STRING default="" message="input file name" />
+<parameter outputFile type=STRING default="" message="output file name" />
+
+<input from=inputFile syntax="Cfront.code" to=inputCode/>
+<output to=outputFile syntax="C2F.code" from=inputCode/>
+\end {verbatim}
+
+\note The {\em syntax} attribute in the $input$ and $output$ commands specifies what language syntax 
+to use when parsing/unparsing the input/output code. 
+
+
+\note 
+The syntax files {\em Cfront.code} and {\em C2F.code} are stored  in the POET/lib directory.
+The {\em Cfront.code} file contains syntax definitions for parsing/unparsing C programs. 
+The {\em C2F.code} file contains corresponding Fortran syntax for translating C code to Fortran.
+
+
+
+%\note Code template names are type names and can be used to both specify 
+%the concrete syntax of different languages and to specify the data structure that should be used
+%to store the input code. For more details, see Section~\ref {sec-codeTemplate}.
+%
+%\note Xform routines can define optional parameters whose values
+%are re-configured inside a pair of $[]$ when the routine is being invoked. For more details,
+%see Section~\ref {sec-exp-xformHandle}.
+
+%%%%%%%%%%%%%%%%%%
+\section{Program Optimizations}
+\label {sec-opt-driver}
+%%%%%%%%%%%%%%%%%
+Translating between the syntax of different languages is only a small  part of what POET can be used for.
+In fact, the language is designed to support program optimizations, and a large library of program transformations have been provided to support this purpose. The following example from $POET/examples/applyopt.pt$ shows overall structure of an optimization script in POET.
+
+\begin {verbatim}
+include opt.pi
+
+<parameter inputFile type=STRING default="" message="input file name" />
+<parameter outputFile type=STRING default="" message="output file name" />
+
+
+<trace inputCode,nest1,nest1_1,nest1_2,nest1_3/>
+<input from=inputFile syntax="Ffront.code" to=inputCode/>
+
+<code SingleLoop/>
+<eval
+     SingleLoop#nest1_1=nest1;
+     nest1_2=nest1_1[Nest.body];
+     nest1_3=nest1_2[Nest.body];
+     INSERT(nest1,inputCode);
+
+     UnrollLoops[factor=2;cleanup=1;trace=nest1](nest1_3[Nest.body],nest1_3);
+/>
+
+<output to=outputFile syntax="Ffront.code" from=(inputCode)/>
+\end {verbatim}
+
+\note The first line of the optimization script is an {\it include} directive, which reads in the entire content of file $opt.pi$ before parsing any content of the current file. The file $opt.pi$ is in POET/lib and contains the interface
+of a large collection of loop transformation routines, including the transformation routine {\it UnrollLoops} invoked in the current POET script.
+
+\note The {\it trace} declaration declares a sequence of trace handles (see Section~\ref{sec-traceHandle}), which are global variables that can be embedded in the internal representation of the input code to support 
+transformations to the input code.  In POET, only trace handles can be modified through the side effects of xform routines (see Chapter~\ref{chap-xform} and POET transformation operations (see Section~\ref{sec-op-xform}). 
+
+\note The file {\it Ffront.code} is in POET/lib directory and includes syntax definitions for parsing Fortran code. 
+The code template $SingleLoop$ is defined in {\it Ffront.code}. It needs to be declared again in {\it applyopt.pt}
+because the {\it Ffront.code} file is not read until the entire {\it applyopt.pt} file has been parsed. 
+
+\note The above script assumes that the input file
+contains an annotation which assigns a triply nested loop nest to be the value of the trace handle $nest1$. 
+The three trace handles, $nest1\_1$, $nest1\_2$, $nest1\_3$ are assigned with the each loop contained in the nest. Then, the {\it INSERT} operation (see section~\ref{sec-op-insert}) inserts all trace handles into 
+$inputCode$, which is itself a trace handle. Note that the {\it INSERT} operation can modify $inputCode$ only because it is a trace handle.
+
+\note After inserting all trace handles, the {\it xform} routine {\it UnrollLoops} is invoked to unroll the innermost loop in $nest1\_3$. This routine is defined in {\it POET/lib/opt.pt}, and its interface has already been declared by the include file opt.pi.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%	
+\chapter {Language Overview}
+\label {chap-overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%	
+
+\section {Overview of Concepts}
+
+The following briefly outlines the main concepts that will be covered by the rest of this manual. 
+\begin {enumerate}
+\item {\em Atomic and compound values} (Chapter~\ref{chap-value}).  
+POET supports two types of atomic values: {\em integers and strings}; three types of compound data
+structures: {\em tuples, lists, and maps}; one special user-defined data type: {\em code templates};
+and one function type: {\em xform routine handles}. 
+
+
+\item {\em Code templates (Chapter~\ref{chap-code}).} 
+POET code templates are essentially pointer-based data structures that can 
+be used to build arbitrarily shaped trees and DAGs (directed acyclic graphs). 
+POET uses code templates exclusively to build the AST (Abstract Syntax Tree) internal representations of programs and to support the parsing/unparsing of the input code.
+In particular, code templates are used in the parsing phase to recognize the structure of the input code, 
+in the program evaluation phase to represent the internal structure of programs, 
+and in the unparsing phase to output results to external files.
+
+\item {\em Xform  routines (Chapter~\ref{chap-xform})}, which are functions that each
+takes a number of input parameters  and returns a result. 
+POET xform routines can make recursive function calls to each other, 
+use loops and if-conditionals to iterate over a body of computation, and systematically
+apply transformations or program analysis to internal representations of input code. 
+%The emphasis is on full programming support to easily define arbitrary code  transformations.
+
+\item {\em Variables and Assignments (Chapter~\ref{chap-var}).} 
+POET uses variables to hold values of intermediate evaluation and to reconfigure behaviors of
+the POET interpreter. Variable assignments can be used to modify the values of all types of variables. 
+However,  they cannot modify the internal content of existing compound data structures. For example,
+variable assignment can modify a variable $x$ to contain a new code template object as value,
+but it cannot modify the content of the old code template object contained in $x$, as this object may be
+shared by other variables. 
+
+\item {\em Global commands (Chapter~\ref{chap-commands})}, which are executable instructions 
+at the global scope of POET programs.
+Each global command can appear anywhere in the global scope.
+The collection of global commands  are evaluated in the order of their appearance, where each command can use the result of previous evaluations.
+
+\item {\em Type specifications and pattern matching (Chapter~\ref{chap-type}).} 
+POET is a dynamically typed language and provides a collection of type specifiers, 
+one for each type of values supported by the language, 
+to allow the types of expressions to be dynamically tested and to allow different types of values to be 
+converted to each other. 
+The pattern matching operator ($:$) is used to dynamically examine the types of POET values,
+and the =$>$ and ==$>$ operators are used to convert different types between one another.
+
+\item {\em Parsing specifications and type conversion (Chapter~\ref{chap-parse}).}
+POET provides a collection of parsing specifications to specify how to parse a stream of input tokens
+and convert them into an internal structured representation using code template objects. These parsing
+specifications are used inside code template definitions to guide the parsing/unparsing process and are used
+to dynamically convert different types of values from one to another.
+
+\item {\em Expressions  and built-in operations (Chapter~\ref{chap-exp})}.
+POET provides a large collection of built-in operators to support all types of expressions,
+which are building blocks of  program evaluation. POET expressions must be embedded within
+global commands or code template, xform routine, or variable declarations to be evaluated in POET programs.
+
+\item {\em Statements (Chapter~\ref{chap-stmt})}, which are different from expressions in that they 
+do not have values.
+POET statements serve to provide support for debugging (side effects) and control ow needs such 
+as sequencing of evaluation, conditional evaluation, loops, and early exit from a xform routines.
+\end {enumerate}
+
+
+The POET/lib directory contains an extensive library of xform routines for applying various performance
+optimizations and  
+a large collection of code templates which specialize the xform routines for different programming 
+languages such as C.  The transformation libraries are typically named using
+the ``.pt"  extension, where their header files (which declare only the interfaces of the libraries)
+using the ``.pi" extension. 
+The code template files are typically named using the ``.code"  extensions.
+
+%%%%%%%%
+\section {Categorization of POET Names}
+\label {sec-names}
+%%%%%%%%
+
+When the POET interpreter sees an identifier, it categorizes it into one of the following kinds.
+\begin {itemize}
+\item Code template names, which are names that have been declared as code templates in previous global declarations already processed. If a name, say $MyCode$,  has not been declared,
+it must be written as {\it CODE.MyCode} in order to be parsed by the POET interpreter as a code template name.
+\item {\it Xform} routine names, which are names that have been declared as xform routines
+in previous global declarations. If a name, say $MyRoutine$, has not been declared, it must be written
+as {\it XFORM.MyRoutine} to be treated by the POET interpreter as a xform routine name.
+
+\item Global variable names, which are names declared in the global scope.
+When a global variable, 
+say $MyName$, is used within a local scope (e.g., inside a code template or xform routine body), 
+it must be written as $GLOBAL.MyName$ to avoid being
+treated as a local variable.
+
+\item Static or local variable names. In POET, variables don't need to be declared before used. Therefore,
+unless an identifier has been explicitly declared as a code template name, a xform routine name, or  a global
+variable name, it will be treated as a local variable variable if used within a code template/xform routine
+and will be treated as a static variable if used in the global scope. 
+
+\end {itemize}
+Because a POET program can include multiple files, the ordering of processing different files
+may impact how the names in POET file are interpreted. To avoid misinterpreting code template, 
+xform routine, and global variable names, these names need to be
+properly declared before used in each POET file. 
+Otherwise, the proper prefix, $CODE$, {\it XFORM}, or $GLOBAL$, must be used to qualify the use of these 
+names.
+
+%%%%%%%%
+\section {Components of POET Programs}
+%%%%%%%%%
+
+A POET program can be composed of an arbitrary number of different files, where 
+each file 
+ is composed of a sequence of global declarations and commands of the following kinds.
+\begin {itemize}
+\item  Include directives, each specifies the name of an external file that should be evaluated before
+reading the current file. For example, the following include directives are used to
+start the POET/lib/Cfront.code file.
+\begin {verbatim}
+include ExpStmt.incl
+include Loops.incl
+...
+\end {verbatim}
+All {\em include} directives must be at the start of a POET file, so that the specified external files are guaranteed to have been evaluated before reading the current file.  Additionally, if a file name with extension $.pi$ is included,  a corresponding library file with the same name but with extension $.pt$ will loaded and evaluated
+together with the current file. 
+That is, the $.pi$ extension has been reserved by POET to indicate interface
+files of different libraries.
+\item Xform routine declarations (see Section~\ref{sec-xform-def}), which define global functions that can be invoked to operate on arbitrary input code. 
+\item Global variable declarations(See section~\ref{sec-var-global}), which define global names that 
+can be accessed across different POET files.
+%as macros to
+%modify the default behavior configurations of the POET interpreter, command-line  parameters whose values can be modified via command line options when invoking a POET program, and trace handles which
+%can be used to track transformations applied to input code.
+
+\item Code template declarations (see Section~\ref{sec-code-def}), which define global
+code template types and their syntax in various source languages.
+\item Global commands (see Chapter~\ref{chap-commands}) which define what input computations to parse 
+and process, what expressions to evaluate, and what results to output to external files.
+\item Comments, which are either enclosed inside a pair of $<$* and *$>$, or from $<$$<$* until the end of
+the current line. 
+Specifically, all strings enclosed within $<$* and *$>$ will be ignored by the POET interpreter,
+and all strings following $<$$<$* until the end of line will be ignored.
+\end {itemize}
+
+Except for the {\em include} directives, which must be put at the start of a POET file, all the other POET
+global declarations and commands can appear in arbitrary order.
+The global declarations serve to specify attributes of global names (e.g., global variables,
+code templates and xform routines). In contrast, the global commands  are actual
+instructions that are evaluated according to the order
+of their appearance in the POET program.
+ 
+As explained in Section~\ref {sec-names}, the ordering of processing global declarations may impact
+how different names used in a POET file are interpreted, e.g., as a code template name or a local variable name. 
+It is important to note that each POET file is first parsed and saved in an internal
+representation before being evaluated. 
+Therefore, although the global $input$ command can include external POET files,
+the declarations contained in these files are {\em not} visible to the current POET file being processed.
+{\em The only way to make visible the global declarations of other files is to use the  include
+directives at the start of a POET file. }
+%Because of this, although the name $TransformCode$ is defined in
+%$xformFile$, it needs to be declared in $TranslatorDriver$ as a xform routine name to avoid
+%being treated as a regular global variable.
+
+%%%%%%%%%%%
+\section {Notations}
+%%%%%%%%%%%%
+The following notations will be used throughout the rest of this POET manual 
+ when using BNF  to specify the context-free
+grammar of POET.
+\begin {itemize}
+\item $<$concept$>$, which specifies a  concept equivalent to a non-terminal in BNF. 
+Each $concept$ has its own syntax and semantics explained elsewhere.
+Examples of concepts include $<$exp$>$ (all POET expressions), $<$type$>$ (all POET
+type specifiers).
+\item $[ syntax ]$, which specifies  that the appearance of $syntax$ (could be any syntax definition)
+is optional. For example, $[ default=$$<$exp$>]$ indicates that the definition of the default value 
+(using the $default$ keyword) can be optionally skipped.
+\item $\{ syntax \}$, which specifies that the appearance of $syntax$ (could be any syntax definition)
+can be repeated arbitrary times (include $0$ times, which means $syntax$ can be optionally skipped).
+For example $\{ , <id> [ = $$<$exp$>] \} $ indicates that additional variable initializations (separated by ``,") can appear arbitrary times.
+\item $/* comments */$, which is not a part of the BNF production but is a comment that explains the
+ BNF concept that immediately precedes it.
+\end {itemize}
+Because the above notations have given $<,>,[,],\{,\}$ special meanings, these characters are quoted with ``" when
+they are part of the language syntax.
+
+The following concepts are used throughout the manual to specify syntax of the POET language.
+\begin {itemize}
+\item $<$id$>$: all variable names.
+\item $<$pos\_int$>$: all positive integer values, e.g., 1,2,3,....
+\item $<$type$>$: all POET type specifications, defined in Section~\ref {sec-typeSpec}.
+\item $<$pattern$>$: all POET pattern specifications, defined in Section~\ref {sec-pattern}.
+\item $<$parse\_spec$>$: all POET parsing specifications, defined in Section~\ref {sec-parseSpec}.
+\item $<$exp$>$: all POET expressions, defined in Chapter~\ref {chap-exp}.
+\end {itemize}
+
+%%%%%%%%%%%%
+\chapter {Atomic and Compound Data Types}
+\label {chap-value}
+%%%%%%%%%%
+
+POET supports two types of atomic values: integers and strings; three types of compound data
+structures: tuples, lists, and associative maps; one user-defined compound data type: code templates;
+and one user-defined function type: xform handles.
+
+Note that if cycles exist within the internal  representation of a computation, 
+attempting to traverse
+the entire representation would cause infinite recursion and thus break the POET interpreter.
+To prevent cycles from being formed,
+POET does not allow the modification of the content of compound data structures such as 
+tuples, lists, and code templates, which can be used collectively to
+build internal representations of computation. The only compound data structure that can be
+modified is {\em associative maps}, which cannot be used inside other compound data structures
+and therefore do not affect the traversal of program internal representations.
+ 
+\section {Atomic Values}
+\label {sec-atomic-value}
+POET supports two types of atomic values, integers and strings. 
+It does not support floating point values under the assumption that  
+code transformation and analysis do not need floating point evaluations.
+The language may be extended in the future if the need of floating point values comes up.
+Like C, POET uses integers to represent boolean values: the integer value $0$ is equivalent to
+boolean value $false$, and all the other integers are treated as the boolean value $true$.
+It provides two boolean value macros, $TRUE$ and $FALSE$, to denote the corresponding integer values 1 and 0 respectively.
+
+\subsection {Integers}
+An integer value is simply a sequence of digits, e.g., 12345, 27.
+POET provides built-in operations to support integer arithmetics ($+$,$-$,$*$,$/$,$\%$), 
+integer comparisons 
+($<$,$<=$,$>$,$>=$,$==$,$!=$), and boolean arithmetics ($!$, $\&\&$ and 
+$||$). The semantic definition of these operations is straightforward 
+and follows the C language. 
+Except the $==$ and $!=$ operators, which apply to all types of values, 
+the other arithmetic and comparison operations are defined for integer values only.
+When evaluating boolean 
+operations, all input values are converted to integers 
+1 and 0,  where
+empty strings are converted to 0 and all other non-integer values to 1.
+
+\subsection {Strings}
+A string value is defined by enclosing the content within a pair of double quotes, e.g., ``hello", ``123". 
+The escaped strings ``$\setminus$n", ``$\setminus$r" and ``$\setminus$t" have the same meaning as those in C.
+POET additionally provides a special string, ENDL, to denote line-breaks in the underlying language.
+
+POET treats strings as atomic values and does not allow modifications to the contents of strings. 
+It provides a binary operator $\wedge$  to support string concatenation, e.g.,  ``abc"  $\wedge$ 3  $\wedge$  ``def" returns $``abc3def"$ (note that integer operands are automatically converted to strings before used in the concatenation). Instead of providing any substring construction support, POET provides an operator $SPLIT$ which can be used to split strings into lists of substrings based on a specified separator. For example, $SPLIT(``,", ``abd,ade")$ returns a list of three strings $(``abd"  ``," ``ade")$.  
+Similarly, $SPLIT$ can also be applied to all strings contained in an input. For example, 
+$SPLIT(``+",  Stmt\#(``a + b +c "))$ will return $Stmt\#(``a" ``+" ``b" ``+" ``c")$. 
+If the separator is an integer $n$, the $PLIT$ operator will split immediately after the $n$th character of the string.
+For example $(SPLIT(1,``abc") = (``a" ``bc")$.
+
+\section{Compound Data Structures}
+\label {sec-compound-value}
+
+POET supports three types of compound data structures: lists, tuples, and associative maps.
+
+\subsection {Lists}
+\label {sec-list}
+
+A POET list is simply a singly linked list of elements. 
+Lists are extensively used in POET
+to conveniently store elements that will to be accessed 
+sequentially (one element after another). 
+
+A POET list can be composed by simply listing elements together. 
+For example, (a ``$<=$" b) produces a list  with 
+three elements, a, ``$<=$", and b. 
+Additionally, the operator $::$ is provided to dynamically extend existing lists.
+For example, if $b$ is a list, $a::b$ inserts $a$
+into $b$ so that the value of $a$ becomes the first element of the new list.  
+Because lists can be dynamically extended, they  often contain an unknown number of elements. 
+
+Two operations are provided to access elements in a list $\ell$:
+$HEAD(\ell)$ (or $car (\ell)$), which returns the first element of $\ell$
+(if $\ell$ is not a list, it simply returns $\ell$);
+and $TAIL(\ell)$ (or $cdr (\ell)$), which returns the tail of the list (if $\ell$ is not
+a list, it returns the empty string ``").
+For example, if $\ell$ = ($a$ ``$<=$d'' $3$), then $HEAD(\ell)$ (or $car ( \ell)$) returns $a$,
+$HEAD(TAIL(\ell))$ (or $car (cdr (\ell))$) returns ``$<=$'', and 
+$HEAD(TAIL(TAIL(\ell)))$ (or $car (cdr (cdr (\ell)))$) returns $3$;
+
+The number of elements in a list may be obtained using the $LEN$ operator.
+For example, $LEN(1 2 3) = 3$.
+
+When being unparsed to external files, the elements within a list are 
+output  one after the other without any space, e.g, a list (``a" ``+" 3) is unparsed
+as  ``a+3". 
+
+
+\subsection {Tuples}
+\label {sec-tuple}
+A POET tuple is simply a finite number of elements enumerated in a predetermined order.
+All elements within a tuple must be explicitly specified when constructing the tuple,
+so tuples cannot be built dynamically (e.g., using a loop).
+Because of their static nature,  tuples are used to define a finite sequence of 
+values, e.g, the parameters for a code template or a {\it xform} routines.
+
+A tuples is composed by connecting 
+a predetermined number of elements with commas. 
+For example, (``i" , 0, ``m" , 1) produces a tuple t with four elements, 
+``i",0,``m", and 1. When being unparsed to an external file, elements in a tuple
+are separated with commas. 
+
+Each element in a tuple $t$ is accessed via the syntax $t[i]$, where $i$
+is the index of the element being accessed (like C, the index starts from 0).
+For example, if $t$ = ($i,0,``m",1)$, then $t[0]$ returns ``i",
+$t[1]$ returns $0$, $t[2]$ returns ``m'', and $t[3]$ returns $1$.
+
+The $LEN$ operator can be used obtain the size of 
+an unknown tuple. For example, $LEN(1,3,4,5) = 4$.
+
+\subsection {Associative Maps}
+\label {sec-map}
+
+POET uses associative maps to efficiently associate two arbitrary types of values. 
+Each associate map is internally implemented using C++ STL 
+maps, and they are the only compound data structure whose internal content can be modified.
+
+The following illustrates how to create and operate on associative maps.
+\begin {verbatim}
+   amap = MAP{};
+   amap["abc"] = 3;
+   amap[4] = "def";
+   bmap = MAP{1 => 5, 2 => 6};
+   PRINT ("size  of amap is " LEN(amap)); 
+   foreach ( (amap bmap) :  (CLEAR from, CLEAR to) : FALSE) {
+       PRINT ("MAPPING " from "=>" to);
+   }
+   PRINT amap;
+   PRINT bmap;
+\end {verbatim}
+The output of the above code is 
+\begin {verbatim}
+size  of amap is  2 . 
+MAPPING  4 => "def" 
+MAPPING  "abc" => 3 
+MAP{4=>"def","abc"=>3}
+MAP(1=>5,2=>6}
+\end {verbatim}
+To create an empty map, use the {\it MAP} operator with an empty pair of \{\}.
+%with two parameters: the type of the associative
+%key and the type of the associated values respectively (the $\_$ token indicates an arbitrary type). 
+%For more details on how to specify types, see Section~\ref{sec-typeSpec}.
+To create a map with a collection of pre-known entries, invoke the {\it MAP} operator followed by a tuple of
+entries enclosed within a pair of $\{\}$. 
+
+The elements within a map can be accessed using the ``[]" operator and modified using assignments. If $e$ 
+is an associative key inside the map $amap$, then $amap[e]$ returns the mapping result; otherwise, the 
+empty string ``" is returned. 
+
+The size of a map $amap$ can be obtained using 
+{\it LEN}$(amap)$. All the elements within the map can enumerated using the built-in $foreach$ statement. 
+For more details about the $foreach$ statement and the $PRINT$ operation, see Section~\ref {sec-stmt-foreach} and~\ref {sec-op-PRINT}.  
+
+\section {Code Templates}
+\label {sec-codeTemp}
+
+To a certain extent, POET code templates are just like C structs, where each code template name
+specifies a different type, and each component of the data structure is given a specific field name.
+Code template objects are essentially recursive pointer-based data structures and are mostly
+used to build dynamically shaped trees and DAGs (directed acyclic graphs). 
+POET uses code templates extensively to build the AST (Abstract Syntax Tree) internal representations of programs for transformation or analysis. POET offers integrated support for associating many parsing/unparsing
+specifications with each code template (see Chapter~\ref{chap-code}), so that input programs can be automatically parsed and converted to their internal code template representations.
+
+
+The syntax for building a code template is 
+\begin {verbatim}
+<id> # (<exp> {, <exp>})
+\end {verbatim}
+where $<$id$>$ is the code template name, and each $<$exp$>$ specifies a value for each parameter (i.e., 
+each data field) of the code template.
+For example, $Loop\#(``i",0,``N", 1)$ and $Exp\#(``abc / 2")$ build objects of the code templates $Loop$ and $Exp$ respectively.  Section~\ref{sec-code-def} presents details on how to define different code template types.
+
+
+To get the values of data fields within a code template object, use syntax
+\begin {verbatim}
+<exp>[ <id1> . <id2>]
+\end {verbatim}
+where $<$exp$>$ is the code template object, $<$id1$>$ is the name of the code template, and
+$<$id2$>$ is the name of the template parameter.
+For example, $aLoop[Loop.i]$ returns the value of the $i$ data field in $aLoop$, which is an object
+of the code template type $Loop$. 
+Similarly, $aLoop[Loop.step]$ returns the value of the $step$ field in $aLoop$.
+If $aLoop$ is built via $Loop\#(``ivar", 5, 100,1)$, then $aLoop[Loop.i]$ returns value ``ivar",
+and $aLoop[Loop.step]$ returns value $1$.
+
+%%%%%%%
+\section {Xform Routine Handles}
+\label {sec-xformHandle}
+%%%%%
+A xform routine handle is  similar to a C function pointer except that it
+includes not only the global name of a routine but also a number of values for the
+optional parameters of the routine.  Similar to C functions,  POET xform routines can be defined
+only at the global scope. So each  name uniquely identifies a xform routine. 
+
+POET xform routine handles are essentially function pointers that can be used as values of variables, which can then later be used in function
+invocations. An invocation succeeds, however, only if
+the function variable indeed contains a {\it xform} routine handle as value; otherwise, 
+a list that contains two components
+will be returned as result (i.e., the invocation will be interpreted as the construction of a list data structure).
+
+Each xform routine handle can be defined using the following syntax.
+\begin {verbatim}
+<id> [ "["<id>=<exp> { ;.<id>=<exp>} "]" ]
+\end {verbatim}
+Here each
+{\it $<$id$>$=$<$type$>$} defines a new value for an optional parameter (name defined by $<$id$>$) 
+of the xform routine.
+Therefore, optional parameters of an xform routine can be given values before the routine is actually
+invoked. 
+Since a xform routine handle can be used in arbitrary places where an expression is expected and can be invoked at an arbitrary time in the future, an xform routine handle can pre-configure behaviors of an
+xform routine before it is invoked.
+To take advantage of this support,  parameters that can be used to reconfigure the behavior of an {\em xform} routine should always
+be defined as optional parameters. Only pure input parameters (parameters that define the input
+of the routine) should be declared as required parameters.
+
+
+
+
+%%%%%%%%%%%%%
+\chapter {Code Templates}
+\label {chap-code}
+%%%%%%%%%%%
+In POET, code templates are user-defined compound data structures that are used to represent the input computation in a structured fashion.
+They are used to define how to parse an input computation, how to implement the internal representation
+of the computation, 
+and how to unparse internal representations to external files. 
+
+\section {Defining Code Templates}
+\label {sec-code-def}
+
+The syntax for defining a code template is
+\begin {verbatim}
+  "<" code  <id>  [ pars = (<id> [: <parse_spec> ] {, <id> [: <parse_spec]}) ]
+                  [parse = <parse_spec>]
+                  [lookahead=<pos_int>]
+                  [rebuild = <exp>] 
+                   [match=<type>]
+                  [output = <type>]
+                  {<id> = <type> } "/>"
+\end {verbatim}
+or
+\begin {verbatim}
+  "<" code  <id>  [pars = (<id> [: <parse_spec> ] {, <id> [: <parse_spec]})]
+                  [parse = <parse_spec>]
+                  [lookahead=<pos_int>]
+                  [rebuild = <exp>] 
+                  [match=<type>]
+                  [output = <type>]
+                  {<id> = <type> } ">"
+<exp>          /* body of code template*/
+"</"code">"
+\end {verbatim}
+The first BNF declares the interface of the code template; i.e., the data type used to
+implement internal representations of programs.
+The second BNF
+additionally defines the concrete syntax of code template; that is, how to parse the input file
+to build the internal representation and how to
+unparse the internal representation to external files.
+
+Each POET code template is like a C struct, where the name of the code template defines a unique 
+global data type.
+In particular,
+each code template defines a unique user-defined compound data structure, where the template parameters are data fields within the structure.
+A code template can be declared an arbitrary number of times.
+However, its concrete syntax definition can be encountered only once during each evaluation
+of parsing/unparsing,  unless the POET interpreter
+ is invoked with the command-line option $-md$.
+Except the code template name, all the other components of a code template declaration are optional.
+The following explains the semantics of each optional component.
+
+\section {Template Parameters}
+\label {sec-code-param}
+In the following examples,
+\begin {verbatim}
+<code Loop pars=(i,start,stop,step)/>
+<code If pars=(condition:EXP) >
+if (@condition@)
+</code>
+\end {verbatim}
+the  
+ {\it pars=...} syntax specifies the required parameters of the code templates.  Each template 
+ parameter is specified either using  a single name or a $<$id$>$ : $<$parse\_spec$>$ pair, which specifies both
+the parameter name and how to obtain the parameter value via parsing .
+For example, the code template $Loop$ has four required parameters (data fields): $i$, $start$, $stop$, and $step$; the code template $If$ has a single parameter, $condition$, which is an $EXP$. Details of parsing
+specifications are explained in Section~\ref{sec-parseSpec}.
+
+
+\section {Template Body}
+\label {sec-code-body}
+
+The body of each code template 
+is a POET expression that defines the concrete syntax of the code template
+both for parsing input code and for unparsing transformation results.
+The template body is typically a list of strings in another source-level  language (e.g., C, C++). 
+If evaluation of  POET expressions are necessary within the body, the POET expressions need to
+be wrapped inside pairs of  \@ symbols. The following shows the definition of the $Loop$
+code template body in $POET/lib/Cfront.code$.
+\begin {verbatim}
+<code Loop pars=(i:ID,start:EXP, stop:EXP, step:EXP) >
+for (@i@=@start@; @i@<@stop@; @i@+=@step@)
+</code>
+\end {verbatim}
+
+By default, POET uses the bodies of code templates as the basis both for constructing internal
+representations of programs from parsing and for  unparsing internal representations
+to external files. When trying to parse the strings (tokens) of an input program
+against a specific code template, the POET  parser first substitutes each 
+template parameter
+with its declared type  in the code template body (if no type is declared for the parameter,
+the $ANY$ type specifier, which can be matched to an arbitrary string,  will be used).  
+The substituted  template body is then matched
+against the leading strings of the input. 
+%The parsing based matching is in many ways similar to the pattern matching process in Section~\ref {sec-pattern}, except 
+Whenever a code template type within the template body is encountered,
+the POET parser tries to match the program input against the new code template.
+This strategy essentially builds a recursive-descent parser on-the-fly by interpreting the code template
+bodies. Note that since POET uses recursive descent parsing, the code templates cannot be left-recursive;
+that is, the starting symbol in the template body cannot recursively start with the same code template type.
+If a left-recursive code template is encountered during parsing evaluation,
+segmentation fault will occur as is the case for all recursive descent parsers.
+
+%%%
+\section {Optional attributes}
+\label {sec-code-attr}
+%%
+Each code template declaration can optionally include a sequence of attributes, each defined using syntax
+{\it $<$id$>$=$<$type$>$},  where $<$id$>$ is the attribute name,
+ and $<$type$>$ specifies the default value of the particular attribute. 
+%The values for these attributes can be specified together with the values
+%for code template parameters when constructing code template objectsusing the $\#$ operator.
+For example, the following code template declaration
+\begin {verbatim}
+<code Loop pars=(i,start,stop,step)  maxiternum=""/>
+\end {verbatim}
+specifies an optional attribute named $maxiternum$, which remembers the maximal number of
+iterations that a loop may take.
+%A $Loop$ code template object such as the following\\
+%$Loop\#("i",0,m,1)\#100$
+%can be constructed which specifies (after the second $\#$ sign) that
+%the maximal iteration number of the loop is $100$.
+
+While users can define arbitrary attribute names for a code template, 
+ several keywords ($parse$, $lookahead$, $rebuild$,  $match$, $output$,
+ $unparse$, $rebuild$, $parse$, and $output$) are reserved and 
+ are used to specify how to  parse, unparse, simplify, operate on  
+ objects of the code template.
+ 
+ \subsection {The {\it parse} attribute} 
+ This attribute specifies how to parse the input computation against the particular code template.
+ Specifically, when the $parse$ attribute is defined, the template body  is no longer used to parse a given input.
+ Instead, the value of the $parse$ attribute is used.
+  %The only difference here is that no local or global variables are allowed in the specification.
+
+A common use for the $parse$ attribute is to specify an alternative xform routine
+% which specifies a  {\it xform} routine that should take the parsing responsibility
+% for the code template; that is, the $xform$ routine should be used
+to convert input tokens to code template objects.  Such xform routines are called {\it parsing functions}.
+% As illustrated by the $ParseList$ routine in Figure~\ref{fig-xform}, 
+Each parsing function
+ must take a single parameter, the $input$ token stream to parse, and return a pair of values
+ $(result,leftOver)$, where $result$ is the result of parsing the leading strings in $input$, 
+ and $leftOver$ is the rest of the input token stream to continue parsing. 
+ A number of commonly used parsing functions are defined in the $POET/lib/utils$.
+ 
+ Another common use of the $parse$ attributes is to utilize the built-in parsing
+capabilities defined in POET. 
+For example, the following code template definition defines
+the $parse$ attribute to be a list of $Name:  $s separated by ``,". 
+\begin {verbatim} 
+ <code NameList pars=(content) parse=LIST(Name,",") />
+\end {verbatim}
+%Since the $parse$ attribute can be given any $<$parse\_spec$>$ value as defined in Section~\ref {sec-op-parse} (except variable assignment), other operators such as $TUPLE$ can be used similarly. 
+%When the $LIST$ or $TUPLE$ specifier is used as value of the $parse$ attribute, the unparsing
+%is done accordingly as well; that is, using $LIST$ or $TUPLE$ as values for the $parse$ attribute 
+Using the $parse$ attribute can change how the code template is unparsed as well.  
+For example, given the $NameList$ code template definition above, 
+when a $NameList$ object needs to be unparsed to an external file, each component will be separated with a ``,". 
+
+\subsection {The {\it lookahead} attribute}
+The POET interpreter uses a recursive descent parser to dynamically match input tokens
+against the concrete syntax of code templates.
+Since multiple alternative code templates may  be specified to match the input, 
+the POET parser uses the leading input tokens to determine which code template to choose.
+Specifically, if the $lookahead$ attribute is given value $n$ for a code template,  
+the next $n$ input tokens is used to determine whether to select the particular code template for parsing.
+By default, $n=1$ for all code templates.
+
+\subsection {The {\it match} attribute}
+This attribute specifies an alternative expression that can be used to substitute the current code template 
+during pattern matching operations (see Section~\ref{sec-pattern}). In particular, if 
+the code template fails to match against a given input during pattern matching, the POET interpreter
+uses the value of code template's $match$ attribute as an alternative target and tries again.
+For example, the following code template definition
+\begin {verbatim}
+<code Ctrl parse=If|While|For|Else match=Loop|If|While|For|Else />
+\end {verbatim}
+specifies that the $Ctrl$ code template can be matched against any of the {\it If}, $While$, $For$, or $Else$
+control flow concepts.
+
+
+\paragraph {The {\it rebuild} attribute}  
+This attribute specifies an alternative expression that should be used to substitute the resulting 
+code template object during parsing or when the REBUILD operator (see Section~\ref {sec-op-xform}) is invoked. 
+For example, the following code template definition
+\begin {verbatim}
+<code StmtBlock pars=(stmts:StmtList) rebuild=stmts>
+{
+   @stmts@
+}
+</code>
+\end {verbatim}
+specifies that after parsing the input computation using the $StmtBlock$ code template, the value
+of the template parameter $stmts$ should be returned as result of parsing.
+The rebuild expression can use both the template parameters and other optional attributes and can
+optionally invoke existing xform routines to build the desired result. 
+The result of evaluating the expression will be returned  as the result of parsing or the result of the REBUILD operator.
+ 
+\subsection {The {\it output} attribute} 
+This attribute specifies an alternative expression that should be evaluated when 
+a code template object needs to be unparsed to an external file.  By default, the concrete syntax
+(i.e., the template body) of the code template is used both for parsing and unparsing. However,
+for some code templates, this may not be the right choice. For example, the following code template
+definition (taken from $POET/lib/Cfront.code$) invokes the $UnparseStmt$ routine to unparse 
+all C statements, where a pair of \{ \} is wrapped around a statement block if more than one statements
+are unparsed.
+\begin {verbatim}
+<code Stmt pars=(content:GLOBAL.STMT_BASE) output=(XFORM.UnparseStmt(content)) >
+@content@
+</code>
+\end {verbatim}
+
+\subsection {The {\it INHERIT} value}
+Each optional attribute in a code template definition must be given a constant value, e.g., an empty string, as its default value. A special value, named {\it INHERIT}, is provided by POET to provide context information when using code templates during parsing. In particular, the {\it INHERIT} value contains the previous code template object constructed by the POET recursive descent parser immediately before the current code template is used to match the input token stream.  It can be used as the default value for any of the optional attributes defined
+above. For example, the following code template definition (from $POET/lib/Cfront.code$)
+\begin {verbatim}
+<code Else ifNest=INHERIT>
+else
+</code>
+\end {verbatim}
+specifies that the {\it ifNest} attribute should be initialized with the previous code template object (i.e., the {\it If} statement immediately before the $else$ keyword). 
+
+%\subsection {The $cond$ attribute} imposes additional constraints  constructing code templates during parsing;
+%that is,  the $cond$ attribute expression must evaluate to $true$ (a non-zero integer) when given
+%the values for the code template parameters. The $cond$ expression is evaluated when building 
+%code template objects  during parsing. 
+%For example, in the following code template definition, the $cond$ expression ensures that the $Name:  $
+%code template won't be built with an empty string as content.
+%\begin {verbatim}
+%< *A marker for names composed of sub-components *>
+%<code Name pars=(content) parse=ParseList[continue=is_name]
+%           cond=(content!= "")
+%           rebuild=IgnoreCodeIfSingle[ignore=STRING;code=Name]>
+%@content@
+%</code>
+%\end {verbatim}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%	
+\chapter {Xform Routines}
+\label {chap-xform}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%	
+
+Each xform routine  in POET is a function that
+takes a number of input parameters  and returns a result. 
+POET xform routines can make recursive function calls to each other, 
+use loops and if-conditionals to operate on the internal representation of
+some input code, and systematically
+apply transformations based on pattern matching or alternative program analysis results. 
+%The emphasis is on full programming support to easily define arbitrary code  transformations.
+
+Note that POET xform routines
+operate on the internal representation (known in the compiler world as Abstract Syntax Tree)
+ of the input code without
+knowing what input languages the ASTs are built from or what  output languages
+they will be unparsed to. 
+These xform routines are generic in the sense that
+they can be invoked to operate on code parsed from arbitrary programming languages.
+To switch to other programming languages, 
+the user only needs to switch the language syntax descriptions, and the xform routines can be reused
+across different input/output languages.
+%%%%%%
+\section {Xform Routine Declarations}
+\label {sec-xform-def}
+%%%%%%
+The syntax for defining a {\it xform} routine is
+\begin {verbatim}
+"<" xform  <id>  pars = ( <id> [: <type>] {, <id> [: <type>]} ) 
+               { <id> = <type> }
+               [output=( <id> {, <id>} ) ] "/>"
+\end {verbatim}
+which declares the interface of a {\it xform} routine, or 
+\begin {verbatim}
+"<" xform  <id>  pars = ( <id> [: <type>] {, <id> [: <type>]} ) 
+               { <id> = <type> }
+               [output=( <id> {, <id>} ) ] ">"
+<exp>         /* body of xform routine */
+"</"xform">"
+\end {verbatim}
+which additionally defines the implementation (i.e., the body) of the routine.  
+Here,  the first $<$id$>$ specifies the name of the {\it xform} routine;  {\it pars=...} specifies the required input parameters of the routine; the optional {\it output=...} specifies that the routine returns
+a tuple of values; and each
+{\it $<$id$>$=$<$type$>$} specifies an additional optional parameter (name defined by $<$id$>$) 
+ and the default value (defined by $<$type$>$) of the parameter. 
+When each {\it xform} routine is invoked, a value must be given for each required parameter (defined
+using ``pars=...").  Additional arguments may be supplied to replace the default values of the optional parameters, but these arguments are not required. 
+
+The following shows two example xform routine declarations in POET/lib/utils.incl.
+\begin {verbatim}
+<xform ParseList pars=(input) stop="" continue="" output=(result, leftOver)/>
+<xform SkipEmpty pars=(input) >
+  for (p_input=input; (cur=car p_input)==" " || cur == "\n" || cur == "\t"; 
+     p_input=cdr p_input)  {""}
+  p_input
+</xform>
+\end {verbatim}
+Here the first xform declaration of $ParseList$ is a forward declaration of the routine interface
+without implementation. 
+It specifies that the routine takes a single parameter named $input$, 
+two optional parameters named $stop$ and $continue$ (both with ``" as their default values),
+and produces a tuple of two values as result. 
+The names in the output specification serve to document the meaning of each value returned by the routine.
+In particular,  if a  $ParseList$ invocation returns
+$x$ as result, the respective return values
+can be accessed using syntax $x[ParseList.result]$ and $x[ParseList.leftOver]$ respectively.
+
+The body of the {\it xform} routine must return a tuple that has the same number of values as specified by the $output$ attribute.
+If the output attribute is missing, a single value is returned by the routine. 
+
+\section {Invoking Xform Routines}
+\label {sec-xform-invoke}
+
+The syntax for invoking a {\it xform} routine is 
+\begin {verbatim}
+<exp1> ( <exp2> {, <exp2>} )
+\end {verbatim}
+Here $<$exp1$>$ is the xform routine handle being invoked (for definition of xform routine handles, see Section~\ref{sec-xformHandle}), 
+and the list of expressions inside the pair of $()$ are values for the required parameters of the routine.
+For example, the following invocation
+\begin {verbatim}
+ScalarRepl[init_loc=nest1; trace=nest1] 
+("a_buf",alphaA, "i" * lda + "l", dim, nest1[Nest.body])
+\end {verbatim}
+invokes a xform routine handle $ScalarRepl[init\_loc=nest1; trace=nest1]$ with actual parameters 
+$``a\_buf", alphaA, ...$.
+Within the xform handle, the optional parameter $init\_loc$ is set to $nest1$, 
+%which defines the location to insert initialization of scalar variables;
+and the optional parameter $trace$ is set to be $nest1$.
+% which defines the trace handle to hold the resulting code  (the trace handle will be updated within the routine to keep track of the transformation result).
+
+%%%%%%%%%%%%%%%%%%%%%%%
+\chapter {Variables And Assignments}
+\label {chap-var}
+%%%%%%%
+
+POET variables serve as place holders that store results of previous evaluations
+or reconfigurations of the POET interpreter.
+%Most variables in POET do not need to be
+%declared before used. 
+POET supports the following kinds of variables.
+\begin {enumerate}
+
+\item {\em Local variables}, whose lifetime span through a single code template 
+and transformation routine definition.
+
+\item {\em Static variables}, whose lifetime span through the entire program but can
+be accessed only within a single POET file; i.e., their scope is restrained within a single file.
+
+\item {\em Dynamic variables}, whose lifetime span the entire program, 
+and they can be dynamically created and operated on
+at any point in the program.
+
+\item {\em Global variables}, whose lifetime span 
+throughout the entire POET program, and they can be accessed at the global scope 
+across multiple POET files. 
+\end {enumerate}
+Each category of  variables are created in symbol tables separate from the other kinds of variables. 
+Further, since POET is dynamically typed, 
+only global variables need to be declared before being used.
+The types  of all variables are  checked at runtime to ensure correctness of evaluation.
+
+
+\section {Local Variables}
+The lifetime and scope of each local variable is restricted within a single  code template  or xform routine. 
+Local variables are introduced by declaring them as parameters (attributes) of a code template or xform routine, or by simply using them in the body of a code template or xform routine. 
+For example, in the following, 
+\begin {verbatim}
+<code Loop pars=(i:ID,start:EXP, stop:EXP, step:EXP) >
+for (@i@=@start@; @i@<@stop@; @i@+=@step@)
+</code>
+\end {verbatim}
+the variables $i$, $start$, $stop$, and $step$ are local variables of the code template $Loop$.
+In the following example,
+\begin {verbatim}
+<xform SkipEmpty pars=(input) >
+for (p_input=input; (cur=car p_input)==" " || cur == "\n" || cur == "\t"; 
+     p_input=cdr p_input)  {""}
+p_input
+</xform>
+\end {verbatim}
+the variables $input$, $p\_input$, and $cur$ are all local variables of the xform routine $SkipEmpty$.
+
+Code template or {\it xform} routine parameters are given
+values when the respective code template is being used to build an object or when the respective
+xform routine is invoked to operate on some input.
+Other local variables are entirely  contained within code templates or xform routines and are 
+invisible to the outside. 
+A  storage is created for each local variable when a code template is used in parsing/unparser
+or when an {\it xform} routine is invoked, and the storage goes away when the parsing/unparser
+or the routine invocation finishes. None of the storages is visible outside the respective code template 
+or {\it xform} routine.
+
+{\em Note that code template or xform routine definitions cannot use any global variables}.
+The reason for this is to avoid accidental naming conflict. Since local variables do not need to be explicitly 
+declared, all variables used within the body of a code template or xform routine should be considered
+local variables whether or not there happens to be global variables declared with identical names.
+
+\section {Static Variables}
+
+Each POET file can have its own collection of static variables, which are used freely in the global
+commands (see Chapter~\ref{chap-commands}) to store temporary results and 
+to propagate information across different evaluation commands. 
+While the lifetime of these static variables span through the 
+entire program, their scope span only within a single POET file.
+Specifically, to avoid naming conflict across different POET files,
+static  variables are constrained within the POET files that contain them
+(i.e., they are similar to the static variables in C).
+Static variables do not need to be declared before used.
+
+
+\section {Dynamic Variables}
+\label {sec-var-dynamic}
+These are variables dynamically created on the fly by converting an arbitrary
+string to a variable name (for more details, see Section~\ref{sec-typeConvert}). 
+Dynamic variables are provided mainly to support
+dynamic pattern matching. For example, a list of dynamic variables can be
+created to replace all the integers in an unknown expression. The substituted
+expression can then be used as a pattern  to match against other expressions
+that have the a similar structure. Because all dynamic variables are created
+in a single symbol table throughout a POET program, name collision can easily
+occur. Therefore it is strongly discouraged to use dynamic variables
+for purposes other than dynamic pattern matching (e.g., using dynamic variables
+as a way for implicit parameter passing is considered very dangerous). 
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section {Global Variables}
+\label {sec-var-global}
+%%%%%
+
+These are variables whose lifetime span 
+throughout the entire POET program and can be accessed across different POET files. 
+However, each global variable must be explicitly declared being used in the POET program.
+There are three categories of global variables.
+\begin {enumerate}
+\item {\em Command-line parameters}, which are global 
+variables whose values can be redefined via command-line options. 
+\item {\em Macro variables}, which are global variables that can be used to reconfigure the
+behavior of the POET interpreter or the POET program being interpreted.
+\item {\em Trace handles}, which are global variables that
+can be embedded inside the code template representation of computations to keep track of selected fragments 
+as they go through different transformations.  
+\end {enumerate}
+
+\subsection {Command-line parameters}
+
+These are global 
+variables whose values can be defined via command-line options. 
+These command-line parameters act as configuration interfaces to POET programs. 
+Their scope is the entire POET program; that is, once defined,
+they can be directly accessed across different POET files.
+
+POET command-line parameters must be declared before used. 
+To declare a parameter, use the following syntax. 
+\begin {verbatim}
+"<" parameter <id> type=<type>  
+                      parse=<parse_spec>
+                      default=<exp> 
+                      message=<string>  "/>"
+\end {verbatim}
+Here $<$id$>$ specifies the name of the parameter variable; $<$type$>$ specifies
+the type of its value; 
+$<$parse\_spec$>$ specifies how to parse the parameter from command-line strings; 
+$<$exp$>$ specifies the default value of the parameter when the command-line option does not specify an alternative value; and $<$string$>$ is a string literal that documents the meaning of the parameter in the declaration. The following shows several examples of command-line parameter declaration.
+\begin {verbatim}
+<parameter NB type=1.._ default=62 message="Blocking size of the matrices" />
+<parameter pre type="s"|"d" default="d" 
+           message="Whether to compute at single- or double- precision" />
+\end {verbatim}
+\begin {itemize}
+\item The $NB$ parameter is a single integer that must be greater than 1. So the type of $NB$
+is a range (the $lb$ .. $ub$ specifier), which specifies that  the parameter variable must have the integer type and must be within the lower and upper bound specified 
+by $lb$ and $ub$ respectively. 
+Since the parameter has only a lower bound, the special value $\_$ can be used to denote the 
+unknown upper bound. 
+\item The $pre$ parameter can have one of  several alternative values. Here the type of the parameter uses the $|$ operator to enumerate all the possible values (``s" or ``d"). The default value of the above $pre$ parameter is string ``d".
+\end {itemize}
+The command line option to define parameter values is $-p$$<$id$>$=$<$val$>$, where $<$id$>$
+is the name of the parameter variable, and $<$val$>$ is either an integer or a quoted string that defines the value of the parameter. If necessary, the given parameter value will be parsed, and the
+parsing result checked against the given $<$parse\_spec$>$,  before the final result is 
+assigned as value of the parameter.
+For example, $-pNB$=$50$ defines the value of the $NB$ parameter to be $50$.
+The given values for all command-line parameters will be checked against their type specifications to ensure the POET program is correctly invoked. 
+
+\subsection {Trace handles}
+\label {sec-traceHandle}
+
+Trace handles are a special kind of global variables which can be embedded within POET expressions to trace transformations to fragments of the expression. 
+In particular, 
+as various transformations are applied to an input expression, the trace handles can be replaced with
+different  values. Each transformation can therefore operate on the trace handles 
+without being concerned with whether or how many other transformations have already been applied.
+
+Trace handles need to be explicitly declared in order to be embedded into
+POET expressions.  The syntax for declaring trace handles is the following.
+\begin {verbatim}
+ "<" trace  <id>  {,  <id> }  "/>"
+\end {verbatim}
+As example, the following declares a long sequence of global trace handles. 
+\begin {verbatim}
+<trace gemm,gemmDecl,gemmBody,nest3,loopJ,body3,
+      nest2,loopI,body2,nest1,loopL,stmt1/>
+\end {verbatim}
+
+Trace handles are different from other global variables as they can act as integral components of an expression and therefore can be modified
+within {\it xform} routines even if the routines cannot directly access them through their names. 
+In fact, trace handles are the only kind of global variables that can be accessed (modified) inside 
+xform routines.
+As different transformations are applied to an input expression,
+the xform routines can modify the values of trace handles by replacing them 
+with new values.
+
+NOTE that when a sequence of trace handles are declared in a single
+declaration,  as illustrated above,  these trace handles are assumed to be related, and
+the ordering of them in the declaration is assumed to be the same ordering that
+they should appear in a pre-order traversal of an expression when they are embedded in the expression. 
+Subsequently, POET allows these trace handled to be inserted into a POET expression using a single
+operation (see the $INSERT$ operation in Section~\ref{sec-op-insert}). 
+Therefore only related trace handles should be declared in a single
+declaration, and unrelated trace handles should be declared separately to avoid confusion.
+
+\subsection {Macros}
+\label {sec-var-macro}
+POET macro variables are used to reconfigure the
+behavior of the POET interpreter or the POET program being interpreted. 
+The syntax for defining a macro is:
+\begin {verbatim}
+"<" define  <id> <exp> "/>"
+\end {verbatim}
+Here $<$id$>$ is the name of the macro, and $<$exp$>$ is a POET expression
+involving only variables defined so far.
+The following shows some example macro definitions.
+\begin {verbatim}
+<define myVar1 "abc"/>
+<define x  5 />
+<define myFunc DELAY { x = 100; } />
+\end {verbatim}
+The above macro variables are all user-defined names that do not have any special meaning
+to POET.  However, POET does provide some built-in macros that have a special meaning
+and can be used to  modify the default behavior of the POET interpreter, as shown in Section~\ref {sec-macro}.
+
+\section {Reconfiguring POET via Macros}
+\label {sec-macro}
+
+POET  provides a number of built-in macros  to  modify the default behavior of the POET interpreter,
+specifically the behavior of the internal lexer, parser, and unparser when
+used to parse input files and to unparse results to external output files.
+These macros include:
+
+\subsection {The TOKEN Macro}
+This macro reconfigures the internal lexer (tokenizer) that POET uses when reading files using the 
+global $input$ command (see Section~\ref{sec-command-input}).
+For example, the following definition appears in the Cfront.code (the C language syntax) 
+file in the POET/lib directory.
+\begin {verbatim}
+<define TOKEN (("+" "+") ("-" "-") ("=""=") ("<""=") (">""=") ("!""=") 
+               ("+""=") ("-""=") ("&""&") ("|""|") ("-"">") ("*""/") 
+               CODE.FLOAT CODE.Char CODE.String)/>
+\end {verbatim}
+This definition configures the POET interpreter to
+replace every pair of  $``+"$ ``+" into a single $``++"$ token, every pair of 
+$``-" ``-"$
+into $``--"$, and so forth. Additionally, the tokenizer will also recognize the syntax
+of code templates $FLOAT$, $Char$, and $String$ as tokens. 
+
+The {\it CODE.FLOAT} syntax indicates that {\it FLOAT} is the name of a code template,
+even if the code template name has not been explicitly declared.
+
+\subsection {The KEYWORD Macro}
+
+This macro reconfigures the internal recursive descent parser that POET uses when reading files using the 
+global $input$ command (see Section~\ref{sec-command-input}).
+For example, the following definition appears in the Ffront.code (the Fortran language syntax) 
+file in the POET/lib directory.
+\begin {verbatim}
+<define KEYWORDS ("case" "for" "if" "while" "float")/>
+\end {verbatim}
+This definition configures the POET internal parser to treat strings 
+``case", ``for", ``if", ``while", and ``float" as reserved words of the 
+language, so that these strings are not treated as regular strings; i.e.,
+they cannot be matched against the STRING token type during parsing.
+
+
+\subsection {The PREP Macro}
+This macro reconfigures the internal recursive descent parser that POET invokes 
+when reading files using the 
+global $input$ command (see Section~\ref{sec-command-input}).
+For example, the following definition appears in the Ffront.code (the Fortran language syntax) 
+file in the POET/lib directory.
+\begin {verbatim}
+<define PREP ParseLine[comment_col=7;text_len=70] />
+\end {verbatim}
+This definitions configures the POET internal parser to invoke the 
+$ParseLine$ routine as a filter of the token stream before start the parsing process.
+In particular, the $ParseLine$ routine filters out meaningless tokens
+based on specific meanings of column locations, e.g., only characters appearing between
+column 7-79 are meaningful tokens, and an entire line should be skipped 
+if the comment-column is not empty.
+Such preprocessing is necessary for early languages such as Fortran and Cobol. 
+
+\subsection {The BACKTRACK Macro}
+This macro can be used to disable backtracking in the POET's internal parser
+when reading files using the 
+global $input$ command (see Section~\ref{sec-command-input}).
+The following definition from POET/lib/Cfront.code  (the C language syntax)
+accomplishes exactly this task.
+\begin {verbatim}
+<define PARSE FALSE/>
+\end {verbatim}
+Note that when backtracking is disabled, the POET internal parser uses the first
+token of each template body to  determine which code template to use when multiple
+options exist to parse an input code. When multiple code templates start
+with the same token, only the first one will be tried. If the syntax of the chosen code template
+fails to match the input tokens, the entire parsing process files. 
+
+Therefore when backtracking is disabled, the parsing process becomes faster (because
+only one code template will be tried when multiple choices are available) but also more
+restrictive (the parsing fails immediately instead of trying out other options). 
+
+\subsection {The PARSE Macro}
+This macro configures POET's internal parser when reading files using the 
+global $input$ command (see Section~\ref{sec-command-input}).
+For example, 
+the following definition appears in the Cfront.code (the C language syntax) 
+file in the POET/lib directory.
+\begin {verbatim}
+<define PARSE CODE.DeclStmtList/>
+\end {verbatim}
+This definition informs the POET interpreter that unless otherwise specified elsewhere,
+e.g., in the input command, the POET internal parser should use the code template $DeclStmtList$
+as the start non-terminal when parsing program input. 
+
+
+\subsection {The UNPARSE macro}
+This macro adds a post-processor to POET's unparser when evaluating the $output$ command
+(see Section~\ref {sec-command-output}).  
+For example, 
+the following definition appears in the Ffront.code (the Fortran language specialization) 
+file in the POET/lib directory.
+\begin {verbatim}
+<define UNPARSE UnparseLine/>
+\end {verbatim}
+This definition instructs the POET interpreter to invoke the $UnparseLine$ routine (defined in
+the POET/lib/utils.incl file) after the POET unparser has produced a token stream to output to
+an external file.   The $UnparseLine$ routine takes two parameters: the token to output,
+and the location (column number) of the current line in the external file. 
+It will be invoked with the correct parameters when each token needs to be output to the external file.
+The $UnparseLine$ routine will filter the token stream by inserting line breaks and empty spaces as
+required by the column formatting requirements of the source language (e.g., Fortran or Cobol).
+
+The UNPARSE macro can also be redefined to contain a code template as value. For example,
+the following definition appears in POET/lib/Cfront.code (the C language syntax file).
+\begin {verbatim}
+<define UNPARSE CODE.DeclStmtList/>
+\end {verbatim}
+Here the code to output will be treated as an object of the $DeclStmtList$ code template (which inserts
+line breaks between different statements) before
+being unparsed to external files.
+
+\subsection {The Expression Macros}
+\label {sec-macro-exp}
+
+POET provides internal support for parsing expressions, where programers only need to use the {\it EXP} 
+parsing specifier to convert a sequence of tokens to an expression. Several macros are provided to define
+valid terms and operations within an expression, including
+\begin {enumerate}
+\item EXP\_BASE, which defines all the base terms accepted within an expression.
+\item EXP\_BOP,  which defines all the binary operators (in decreasing order of precedence) accepted within an expression.
+\item EXP\_UOP, which defines all the unary operators (in decreasing order of precedence) accepted within an expression.
+\end {enumerate}
+As example, the following EXP configurations are used in POET/lib/Cfront.code (the C syntax file).
+\begin {verbatim}
+<define EXP_BASE INT|FLOAT|String|Char|CODE.VarRef />
+<define EXP_BOP ( ("=" "+=" "-=" "*=" "/=" "%=") ("&" "|") ("&&" "||") ("==" ">=" "<=" "!=" ">" "<")
+                         ("+" "-") ("*" "%" "/") ("." "->")) />
+<define EXP_UOP ("++" "*" "&" "~" "!" "+" "-" "new")/>
+\end {verbatim}
+
+The following additional macros are provided to specify how to construct internal representations of the parsed expressions.
+\begin {enumerate}
+\item EXP\_CALL, which defines the code template to use to represent a function call within the expression.
+\item EXP\_ARRAY, which defines the code template to use to represent an array element access within the expression.
+\item PARSE\_BOP, which defines the code template to use to represent binary operations within the expression.
+\item PARSE\_UOP, which defines the code template to use to represent unary operations within the expression.
+\item BUILD\_BOP, which defines the xform routine to invoke to rebuild binary operations within an expression.
+\item BUILD\_UOP, which defines the xform routine to invoke to rebuild unary operations within an expression.
+\end {enumerate}
+
+The following example macro definitions are contained in POET/lib/ExpStmt.incl, which is included by the Cfront.code file.
+\begin {verbatim}
+<define PARSE_CALL FunctionCall/>
+<define PARSE_ARRAY ArrayAccess/>
+<define PARSE_BOP Bop/>
+<define PARSE_UOP Uop/>
+<define BUILD_BOP BuildBop/>
+<define BUILD_UOP BuildUop/>
+\end {verbatim}
+Note that the above definitions are also used by the POET interpreter when parsing POET expressions.
+Specifically, if the {\it PARSE\_BOP} macro is not defined, when seeing an expression $``abc" + 3$, the POET interpreter
+will report a runtime error (because integers cannot be added to an string). However, if the {\it PARSE\_BOP}
+is defined, the expression $Bop\#(``abc",3)$ will be returned as the result of $``abc"+3$. This feature allows
+internal representation of expressions to be more conveniently built and increases the readability of POET
+programs.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\chapter {Global Commands}
+\label {chap-commands}
+%%%%%%
+
+The previous chapters introduce global declarations, 
+e.g., macro, code template, xform routine, and trace handle
+declarations, which serve to specify attributes of global names (e.g., global macros,
+code templates, and xform routines). 
+In contrast, the global commands, e.g., 
+input, eval, and output commands, are actual instructions that are evaluated according to the order
+of their appearance in the POET program. 
+
+\section {The Input Command}
+\label {sec-command-input}
+
+Each POET input command specifies a number of input code to be parsed and processed.
+The input code could be embedded within the command or could be contained in 
+external files.
+The syntax of an input command is
+\begin {verbatim}
+"<" input  [cond=<exp>] 
+                  [DEBUG=<int>]
+                  [syntax=<exp>] 
+                  [from=<exp>] 
+                  [to=<exp>] 
+                  [annot=<exp>]
+                  [parse=<parse_spec>] "/>" 
+\end {verbatim}
+which specifies that the input code is contained in external files, or 
+\begin {verbatim}
+"<" input  [cond=<exp>] 
+                  [DEBUG=<int>]
+                  [syntax=<exp>] 
+                  [from=<exp>] 
+                  [to=<exp>] 
+                  [annot=<exp>]
+                  [parse=<parse_spec>] ">" 
+   <exp>
+</input>
+\end {verbatim}
+which includes the input computation (specified by $<$exp$>$) inside the body of the input command.
+The following describes the semantics of each optional attribute specification within the $input$ command.  
+\begin {itemize}
+\item  $cond=<$exp$>$ specifies a pre-condition that must
+be satisfied before reading the input code (if the $cond$ expression evaluates to false, no input will be
+read);
+In particular, it enforces that the  $input$ command is evaluated only when
+$exp$ is evaluated to true.
+\item 
+$DEBUG=<$int$>$ specifies that the parsing of input code needs to be debugged at a given level 
+(defined by the constant integer). In particular, the higher the level is, the more debugging information is output. 
+\item
+$syntax=<$exp$>$  specifies a list of  POET file names that contain syntax definitions for code templates
+required to parse the input;
+ A single file name instead of a list of names can also be used.
+\item
+ $from=<$exp$>$ specifies a list of external file names that collectively contain the input code.
+ A single file name instead of a list of names can also be used.
+ \item
+ $to=<$exp$>$ specifies the name of a global variable that should be
+used to stored the parsed input code.
+If a special keyword
+ $POET$ is used in place of a variable name,  the input code will be stored as part of
+ the current POET program. 
+\item
+$annot=<$exp$>$ specifies whether or not to allow annotations in the input code.
+By default, the $annot$
+has a true value, and the parsing process will utilize annotations within the input code; if $annot$ is explicitly
+defined to be false, then annotations (if there is any) will be treated as part of the input code.
+For details of parsing annotations, see Section~\ref {sec-parseAnnot}. 
+\item
+$parse= <$parse\_spec$>$ specifies what start non-terminal (i.e., the top code template) to use
+to parse the input computation. When left unspecified, the value of the macro {\it PARSE} is used as the
+parsing target. 
+%If specified to be the ANY (i.e., the $\_$) type specifier, the input is parsed as a sequence
+%of tokens. 
+If specified using
+a special keyword
+ $POET$,  the input code should be parsed as POET programs. 
+ For more details on parsing specifications, see Section~\ref{sec-parseSpec}.
+\end {itemize}
+
+In the following example,
+\begin {verbatim}
+<input from=inputFile to=inputCode cond=(xformFile!="")
+       syntax=(inputLang xformFile)/>
+\end {verbatim}
+the file name that contains the input code is defined as the value of variable $inputFile$. 
+The syntax of  code templates are  defined both in file $inputLang$ and in
+$xformFile$, which are variables that contain names of the corresponding files.
+The command is evaluated only when $xformFile!=``"$, where
+the input code defined in $inputFile$ will be parsed and translated
+into an internal code template representation based on the included input language syntax definitions.
+
+In the following example,
+\begin {verbatim}
+<input from=xformFile cond=(xformFile!="") parse=POET />
+\end {verbatim}
+the $xformFile$ file is parsed as a POET program.  
+
+\section {The Eval Command}
+\label {sec-command-eval}
+
+Each $eval$ command specifies an expression or a sequence of statements to evaluate. 
+The syntax of an eval command is
+\begin {verbatim}
+"<" eval <exp>  "/>"
+\end {verbatim}
+Here $<$exp$>$ is a POET expression or a sequence of statements defined in chapters~\ref {chap-exp}
+and~\ref{chap-stmt}.
+{\bf All POET expressions and statements must be embedded within an eval command to be evaluated at the
+global scope.}
+
+
+\section {The Output Command}
+\label {sec-command-output}
+POET $output$ commands are used to write internal representations of computations to external files or standard output. 
+The syntax for an output command is
+\begin {verbatim}
+ "<" output  [cond=<exp>]
+                 [syntax=<exp>] 
+                 [from=<exp>] 
+                 [to=<exp>] "/>" 
+\end {verbatim}
+Here  each $<$exp$>$ represents a POET expression. 
+All the attribute specifications ($cond$,$syntax$, etc.) are optional and can be arbitrarily ordered.
+In particular,  
+\begin {itemize}
+\item  $cond=<$exp$>$ specifies a pre-condition that must
+be satisfied before writing the output (if the $cond$ expression evaluates to false, no output will be
+written);
+\item
+$syntax=<$exp$>$  specifies a list of  POET file names that contain syntax definitions for code templates
+required to write the output;
+ A single file name instead of a list of names can also be used.
+ \item
+ $from=<$exp$>$ specifies the expression that should be output to the external file (or $stdout$).
+\item
+ $to=<$exp$>$ specifies the name of an external file to output the specified computation.
+\end {itemize}
+ The following shows some example output commands.
+\begin {verbatim}
+<output cond=(inputLang=="") to=outputFile from=inputCode/>
+<output cond=(inputLang!="") syntax=inputLang to=outputFile from=inputCode/>
+\end {verbatim}
+Here the code contained in $inputCode$ is output to the file whose name is defined by $outputFile$. 
+The syntax of  code templates are  defined in  $inputLang$, 
+which are variables that contain names of the language syntax files.
+When an empty string is specified as the output name (or when no name is specified), the result
+will be written to standard output.
+
+
+%%%%%%%%%%%%%%%%%%%%%%
+\chapter {Type Specifications and Pattern Matching}
+\label {chap-type}
+%%%%%%%%%%%
+
+Since POET is a dynamically typed language, the types of expressions often need to be 
+dynamically checked to determine what operations should be applied to them.  
+POET provides a collection of type specifiers, one for each type of atomic and compound values, 
+to allow the types of expressions to be dynamically tested using pattern matching.
+
+%%%%%
+\section {Type Expressions}
+\label {sec-typeSpec}
+%%%%
+
+POET type expressions (denoted by $<$type$>$ in BNF formula)  
+are used to dynamically categorize arbitrary unknown
+values during evaluation. Each type expression can be any of the following
+type specifiers.
+
+\begin {itemize}
+\item A constant value (i.e., an integer or a string literal), which includes the particular value specified.
+
+\item  A code template name, which includes all objects of the particular code template.
+
+\item {The {\it INT} specifier}.
+The keyword {\it INT} specifies the atomic integer type, which includes all integer values.
+
+\item {The range ($..$) Specifier}.
+The special syntax $lb .. ub$, where $lb$ and $ub$ are integer values or the {\it ANY} specifier $\_$,  specifies a $range$ type which includes all integers $>= lb$ and $<=ub$.
+For example, $3..7$ includes all integers $>=3$ and $<=7$; $1..\_$ and $\_..1$ include all integers $>=1$ 
+and $<=1$ respectively (here the {\it ANY} specifier $\_$ 
+indicates an infinity bound).
+
+\item{The {\it STRING} specifier}.
+The keyword {\it STRING} specifies the atomic string type, which includes all string values. 
+
+\item{The {\it ID} specifier}.
+The keyword {\it ID} specifies the identifier type, which includes all string values that start with 
+a letter (`A'-`Z',`a'-`z') or the underscore (`\_') character and are composed of letters, the underscore (`\_') character, and integer digits. That is, all strings that can be treated as regular variable names. 
+
+\item {The ANY (\_) Specifier}.
+POET uses a single underscore character, $\_$, to denote the universal type that includes all values supported by POET (see Chapter~\ref{chap-value}). 
+
+\item {The {\it TUPLE} Specifier}.
+The keyword {\it TUPLE} specifies the tuple type, which includes all tuples (see Section~\ref{sec-tuple}).
+
+\item {The {\it MAP} Specifier}.
+The {\it MAP} keyword denotes the associative map type (see Section~\ref{sec-map}). 
+It takes two type specifiers, $fromType$ and $toType$, as parameters to indicate the type of element pairs within the map.  
+Specifically, {\it MAP}$(fromType,toType)$ includes all associative maps that associate values of $fromType$ to values of $toType$. In particular, {\it MAP}$(\_,\_)$ includes all maps that may contain arbitrary types of values.
+
+\item {The {\it CODE} Specifier}.
+The keyword {\it CODE} specifies the code template type, which includes all code template objects (see Section~\ref{sec-codeTemp} and Chapter~\ref{chap-code}). 
+
+\item {The {\it XFORM} Specifier}.
+The keyword {\it XFORM} specifies a xform routine type, which includes all {\it xform} routine 
+handles (see Section~\ref{sec-xformHandle} and Chapter~\ref{chap-xform}). 
+
+\item {The {\it VAR} specifier}.
+The keyword {\it VAR} specifies the $variable$ type, which includes all trace handles (see Section~\ref{sec-traceHandle}) that can be embedded within POET expressions.
+
+\item {The {\it EXP} Specifier}.
+The keyword {\it EXP} specifies the expression type, which includes all POET expressions. 
+
+\item {Compound Type Specifiers}.
+Type expressions can be organized into compound data structures using the type constructors 
+for lists, tuples, and code templates. The syntax for building these compound type specifiers includes the following.
+\begin {itemize}
+\item $<$id$>$ \# $<$type$>$, which specifies a code template type with $<$id$>$ as the code template
+name and  $<$type$>$ as specifications for template parameters.
+\item ($<$type\_1$>$,$<$type\_2$>$,......,$<$type\_n$>$), which specifies a tuple of
+$n$ elements, where the type of the $i$th element (i = 1,...,n) is specified by $<$type\_i$>$.
+\item ($<$type\_1$>$ $<$type\_2$>$ ...... $<$type\_n$>$), which specifies a list of
+$n$ elements, where the type of the $i$th element (i = 1,...,n) is specified by $<$type\_i$>$.
+\item $<$type\_1$>$ :: $<$type\_2$>$, which specifies a list type with the type of the first element
+specified by $<$type\_1$>$ and the rest of the list specified by $<$type\_2$>$.
+\item $<$type\_1$>$ ... and $<$type\_1$>$ ....,  both of which specify a $list$ type, where $<$type\_1$>$ specifies the type of elements within the list. 
+Specifically,  $<$type\_1$>$ ... specifies all lists that contain only $<$type\_1$>$ elements, 
+and $<$type\_1$>$ ....  specifies all lists that contain only $<$type\_1$>$ elements and  contain at least one element (that is, the list is not empty).  
+As a special case, $(\_...)$ and $(\_ ....)$ specify lists that may contain arbitrary elements.
+\item $<$type\_1$>$ + $<$type\_2$>$, $<$type\_1$>$ - $<$type\_2$>$, $<$type\_1$>$ * $<$type\_2$>$,
+$<$type\_1$>$ / $<$type\_2$>$, and $<$type\_1$>$ \% $<$type\_2$>$, which specify
+expression types composed of the binary operators $+$, $-$, $*$, $/$, and  $\%$ respectively. 
+In particular, when $<$type\_1$>$ and $<$type\_2$>$ are integer constants, the result of evaluation
+is returned; otherwise, a code template object is built based macro configurations of the POET interpreter 
+(for more details, see Section~\ref{sec-macro-exp}). 
+\end {itemize}
+For example,  {\it (INT INT)} includes all lists formed by two integers, 
+$(INT,INT,INT)$ includes all tuples that contain three integers,
+and $MyCode\#INT$ includes
+all objects of the $MyCode$ code template that contains a single integer as parameter value.
+
+\item {The binary $|$ operator}
+Two type expressions can be combined using the binary $|$ (alternative) operator.
+\begin {verbatim}
+<type1> | <type2>
+\end {verbatim}
+Here the resulting type is alternatively either $<$type1$>$  or $<$type2$>$. 
+For example,  {\it INT $|$ (INT....)} specifies
+a type that is either a single integer or a list of integers.
+
+\item {The unary $\tilde{}$ operator}
+The unary operation $\tilde{}$ $<$type1$>$ specifies the complement of $<$type1$>$; that is, it specifies
+all types of other values as long as the type is not $<$type1$>$.
+
+\end {itemize}
+
+%%%%%%
+\section {The Pattern Matching Operator (the ``:" operator)}
+\label {sec-pattern}
+%%%%%%%%
+POET uses pattern matching to dynamically test the type and structure of arbitrary unknown values.
+Further, uninitialized variables can be used to save the structural information (component values) 
+of the data of interest during the pattern matching process.
+
+The  binary pattern matching operator determines whether or not an expression has a given type.
+ The syntax of operation is
+\begin {verbatim}
+ <exp> ":" <pattern>
+\end {verbatim}
+Here $<$exp$>$ is an arbitrary expression, and $<$pattern$>$ 
+ is a pattern specifier as defined in the following. 
+The operation returns TRUE (integer 1) if $<$exp$>$ matches the pattern specified
+and returns FALSE (integer 0) otherwise.  
+
+The pattern specification $<$pattern$>$ may be in any of the following forms.
+\begin {itemize}
+\item A type specifier that could have any of the format defined in Section~\ref {sec-typeSpec}.
+Here the pattern matching succeeds only if $<$exp$>$ has the specified type.
+ 
+\item An uninitialized variable name or an operation in the following format,
+\begin {verbatim}
+CLEAR <id>
+\end {verbatim}
+Here The CLEAR operator uninitializes an existing variable named $<$id$>$ (for more details, see Section~\ref{sec-op-clear}.
+The pattern matching always succeeds by assigning  the unitialized variable with the value of $<$exp$>$.
+ 
+\item A previously defined variable. The pattern matching succeeds if $<$exp$>$ has the same value as the value of the variable, and fails otherwise.
+
+\item A compound data structure, e.g., a list, a tuple, or a code template, that contains other pattern expressions as components. The pattern matching succeeds if $<$exp$>$ has the specified data structure and its components can be successfully matched against the sub-patterns. 
+For example, $<$exp$>$ can be successfully matched to {\it (pat1 pat2  pat3)} if it
+is a list with three components, each of which can be matched to $pat1$, $pat2$, and $pat3$ respectively.  
+
+\item A $xform$ routine handle, in which case the handle is invoked with $<$exp$>$ as arguments,
+and the matching succeeds  if the invocation returns TRUE (a non-zero integer). This capability
+allows a function to be written to perform complex pattern matching tasks, and the function can be
+used as a pattern specifier in all pattern matching operations. 
+
+\item An assignment operator in the format of $<$id$>$ = $<$pattern$>$, where $<$id$>$ is a single variable name, and $<$pattern$>$ is a pattern specification. Here the pattern matching succeeds if $<$exp$>$ can be successfully matched against $<$pattern$>$; and if succeeds, the variable $<$id$>$ is assigned with the value of $<$exp$>$.
+
+\item Two pattern specifications connected by the binary $|$ operator, in the format of \\
+$<$pattern1$>$ $|$ $<$pattern2$>$. \\
+Here the pattern matching succeeds if $<$exp$>$
+could be matched to either $<$pattern1$>$ or $<$pattern2$>$. For example, $(exp  : INT | STRING)$ returns TRUE if and only if $exp$ is either an integer or a string value. 
+\end{itemize}
+The following illustrates the results of  applying pattern matching to check the types of various expressions. 
+\begin {verbatim}
+       "3" : STRING                            <<* returns 1
+       3 : STRING                              <<* returns 0
+       "3" : ID                                     <<* returns 0
+       "A3" : ID                                  <<* returns 1
+       MyCodeTemplate#"123" : STRING           <<* returns 0
+       MyCodeTemplate#123 : MyCodeTemplate     <<* returns 1
+       3 : MyCodeTemplate                      <<* returns 0
+       MyCodeTemplate#123 : MyCodeTemplate#INT <<* returns 1      
+       ("abc" "." "ext") : STRING              <<* returns 0
+       ("3" "4" "5") : (INT ....)               <<* returns 1
+       3 : (INT ...)                           <<* returns 0 
+       (3 4 5) : (INT ...)                     <<* returns1
+       (3 4 5 "abc") : (INT ...)               <<* returns0
+       (3 4 5 "abc") : (_ ...)                 <<* returns1
+       3 : (0 .. 2)                            <<* returns0
+       3 : (0 .. 5)                            <<* returns1
+       "a" : (0 .. 5)                          <<* returns0
+       "a" : CODE                              <<* returns0
+       MyCodeTemplate : CODE                   <<* returns1
+       MyCodeTemplate#123 : CODE               <<* returns1
+       ("abc" "." "ext") : CODE                <<* returns0
+       MyCodeTemplate#123 : XFORM              <<* returns0
+       ("abc" "." "ext") : XFORM               <<* returns0
+       foo : XFORM                      <<* returns 1; here foo is a xform routine
+       "abc" : TUPLE                           <<* returns0
+       ("abc",2) : TUPLE                       <<* returns1
+       MyCodeTemplate#123 : TUPLE              <<* returns0
+       
+       
+\end {verbatim}
+
+In summary, a pattern specification  may contain arbitrary type expressions  as components
+and may additionally contain uninitialized variables. For example,
+\begin {verbatim}
+(2 3 4) : (first=INT second third)  <<* returns 1;  first =2; second = 3; third = 4  
+\end {verbatim}
+Here  during the pattern matching evaluation, the uninitialized variables ($second$ and $third$) are
+assigned with the necessary values in order to make the matching succeed.
+Further, since the assignment $first=INT$ is inside the pattern specification, the left-hand side
+of the assignment  (i.e., the $first$ variable) is given the value of the matched expression.
+
+Note that when uninitialized variables appear in the pattern specification, 
+these variables are treated as place holders which can be matched to
+arbitrary expressions. If the matching is successful, all the uninitialized
+variables are assigned valid values as part of the evaluation. Therefore the pattern matching
+operation can be used not only for dynamic type checking, but also for initializing
+variables and for assigning values to variables (initialized or uninitialized).
+
+
+%%%%%%%%%%%%%%%%%%%%%%%
+ \chapter {Parsing Specifications and Type Conversion}
+\label {chap-parse}
+%%%%%%%%%%%
+ 
+ POET provides a collection of parsing specifications to guide the process of parsing and unparsing, 
+ where a stream of input tokens is converted into internal structured representations using code templates,
+ and the internal representations are later unparsed to external files with proper syntax.
+These parsing
+specifications are used inside code template definitions to guide the parsing/unparsing process 
+(see Section~\ref{sec-code-attr}), 
+inside expressions to dynamically convert different types of values from one to another, 
+and inside annotations of the input code to improve the parsing efficiency.
+
+
+ \section {Parsing Specifications}
+ \label {sec-parseSpec}
+ %%%%%%%%%
+A parsing specifier specifies what targeting data structure should be used to parse and represent
+a given input. In particular, a parsing specification can be any of the following. 
+\begin {itemize}
+\item  Any of the type specifier defined in Section~\ref{sec-typeSpec}, 
+where the leading input token will be converted to the specified value type as the parsing result. 
+Note that all tokens can be converted to a string or the name of a variable, 
+so all tokens can be successfully parsed using the {\it STRING} or {\it VAR} type specifier.
+But only integers (e.g., 134 or ``134") can be successfully parsed using the {\it INT} specifier,
+and valid expressions can be parsed into an internal representation using the {\it EXP} specifier.
+The operations that are supported within expressions can be dynamically configured using
+macros, as discussed in Section~\ref{sec-macro-exp}.
+
+\item The name of a code template. In this case, the leading tokens in the input  are 
+ matched against the syntax definition of the given code template; if the matching is successful, the matched expression is 
+ converted to an object of the given code template, and parsing continues with the rest of input tokens;
+ otherwise, the parsing fails. 
+ 
+ \item A xform routine handle which takes a single parameter (the input tokens to parse)
+ and returns a pair of two values: $(result, left\_over)$, where $result$ contains the resulting structural representation from parsing the leading strings of input, and $left\_over$ contains the rest 
+ of input after the parsing process. 
+In this case, the xform routine is invoked with input as argument, 
+the $result$ from invoking the routine is saved,
+ and the parsing continues with the $left\_over$ value returned by the routine invocation.
+ 
+ \item A list of parsing specifiers in the form 
+ \begin {verbatim}
+ (<parse_spec1>  <parse_spec2> ...... <parse_spec_n>)
+ \end {verbatim}
+% (<parse_spec1> , <parse_spec2>, ...... (parse_spec_n>)
+ Note that here $<$parse\_spec$>$ is recursively defined. 
+ Here the parsing process tries to match each of the parsing specifiers in turn.
+%not only tries to match the leading tokens in the input with the given 
+%compound data structure, it also tries to match each component of the data 
+% structure with the given $<$parse\_spec$>$. 
+%In particular, if a code template data structure is given,
+% all the data fields of the code template are constructed by invoking the
+%  corresponding $<$parse\_spec$>$. 
+If the parsing succeeds, an object of the given data structure
+will be constructed, and the parsing continues with the rest of the input.
+ 
+ \item A variable assignment in the following format.
+ \begin {verbatim}
+ <id> = <parse_spec1>
+ \end {verbatim}
+ Here the input is parsed against the given $<$parse\_spec1$>$, and the parsing result
+ is saved in the given variable $<$id$>$.
+  
+ \item A {\it TUPLE} specification in the following format.
+ \begin {verbatim}
+ TUPLE(<string_1> <parse_spec_1> ...... <string_n> <parse_spec_n> <string_n+1>)
+ \end {verbatim}
+ Here each $<$string$>$ operand is a single string constant, and each $<$parse\_spec\_1$>$ ...
+ $<$parse\_spec\_n$>$
+ is a parsing specification. In this case, the parsing process tries to convert leading tokens of
+ the input into a tuple of $n$ elements, where $<$parse\_spec\_$i$$>$ (i = 1,...,n) specifies how to parse
+ the $i$th element. The tuple syntax starts with $<$string\_$1$$>$ and ends with the 
+  $<$string\_$n$+$1$$>$,
+ and the $i$th and $i+1$th elements must be separated by $<$string\_$i$+$1$$>$.
+ For example, $TUPLE(``("  INT  ``," INT ``," INT ``)")$ specifies a tuple of three integers, where
+ the tuple syntax must start with ``(" and end with $``)"$, and each pair of elements must be
+ separated with a $``,"$.  The parsing process will try to match the leading input tokens exactly
+ to the specified syntax for the tuple, and fails if any component does not match.
+  
+\item A $LIST$ specification in the following format.
+\begin {verbatim}
+LIST ( <parse_spec_1>, <string>)
+\end {verbatim}
+Here the parsing process will try to construct a list of elements from the leading tokens in the input,
+where $<$parse\_spec\_1$>$ defines
+how to parse each element within the list,  and $<$string$>$ 
+defines what must be the separator between each pair of elements. 
+For example, $LIST(INT, ``;")$ specifies a list of integers separated by ``;"s; and $LIST(INT,`` ")$
+specifies a list of integers separated by spaces.
+
+\item The binary alternative ($|$) operator which connects two sub-specifications in the following format
+\begin {verbatim}
+<parse_spec_1> | <parse_spec_2>
+\end {verbatim} 
+Here the POET parser tries to parse the input using each of the parsing specifications
+in order (if the first one fails, the second one will be tried). 
+For example, {\it INT $|$ (INT,INT)} specifies 
+a single integer or a pair of integers. Note that once the input is successfully matched against
+$<$parse\_spec\_1$>$, the parser will not try $<$parse\_spec\_2$>$ at all.
+So  the operands of the $|$ operator need be listed in the increasing order 
+of their restrictiveness. For example, if we use {\it (STRING $|$ INT) (STRING $|$ INT)} to 
+parse a pair of integer/string values, the input will always be parsed as a pair of strings.
+Specifically, because all integers can be treated as strings, the {\it INT} specifier will never be tried in the
+parsing process.
+ \end {itemize}
+
+  %%%%%%%%%%%%%%
+ \section {Type Conversion (The $=>$ and $==>$ Operators)}
+ \label {sec-typeConvert}
+ %%%
+ POET uses two operators ($=>$ and $==>$ operators) to convert an expression 
+ value from one type to another.    The syntax for applying the operators are
+ \begin {verbatim}
+ <exp>  =>   <parse_ppec>
+ <exp>  ==>  <parse_spec>
+ \end {verbatim}
+Both the $=>$ and $==>$ operators have similar semantics in that they both take the given input $<$exp$>$ , parse the expression against the structural definition contained in $<$parse\_spec$>$, and store the parsing result into variables contained in $<$parse\_spec$>$. 
+ The difference between the $=>$ and $==>$ operators is that when parsing fails, the $=>$ operator reports a runtime error, while the $==>$ operator simply returns false (the integer 0) as result of evaluation. Therefore the $==>$ operator can be used to experimentally parse an input expression using different type specifications.  
+
+ For example, $exp => (var = INT)$ converts an  expression $exp$ to an integer and
+ saves the integer value to variable $var$. 
+ Note that here the type conversion succeeds only if
+ $exp$ can be successfully converted to an integer; a runtime error is reported otherwise.
+ In contrast, $exp ==> (var=INT)$ returns false if the conversion fails.
+Similarly, $exp => (var =STRING)$ can be used to convert arbitrary expressions to a single string.
+Here the conversion will always succeed because all expressions have a string representation.
+To check whether an expression is a string, use the pattern operation ($exp : STRING$).
+The following shows some more type conversion examples.
+\begin {verbatim}
+3 => STRING                    <<* returns  "3"
+MyCodeTemplate#123 => STRING   <<* returns  "MyCodeTemplate#123"
+\end {verbatim}
+
+Note that when an expression is parsed using {\it VAR} parsing specifier,
+the expression is first converted to a string, and the string is then used as the name to 
+create a dynamic variable on the fly. 
+For example, $5=>VAR$ returns a new dynamic variable that 
+contains value 5. 
+The {\it VAR} parsing specifier therefore allows place-holder variables to be dynamically  created for convenient pattern matching. 
+The lifetime and scope
+of these dynamic variables span the entire program, and they can be dynamically created and operated on
+at any point in the program. Section~\ref{sec-var-dynamic} further discusses the concept of dynamic variables.
+
+
+%%%%%%%%%%%%%%%
+ \section {Parsing Annotations}
+ \label {sec-parseAnnot}
+%%%%%%%%
+Based on a collection of  code template definitions, POET 
+can be invoked to dynamically parse an arbitrary input language.
+%However, the recursive descent parser is interpretative, and the parsing process can be slow,
+%especially if backtracking is allowed in the parsing process (backtracking can be turned off
+%via macro definitions, see Section~\ref{sec-global-macro}).
+The input code can be annotated with type specifications to speed up  the parsing process.
+Annotations can also be used to partially parse fragments of an input code, in which case only those
+fragments with annotations are parsed into the desired code template representations,
+and the rest of the code is represented as a stream of tokens. 
+%In general, the more annotations included in the source input, the shorter time it will
+%take the POET interpreter to parse the input code.
+
+The following shows a fragment of input code with parsing annotations \\
+(taken from POET/test/gemvATLAS/gemv-T.pt).
+{\scriptsize
+\begin {verbatim}
+/*@; BEGIN(gemv=FunctionDecl) @*/
+void ATL_/*@@*/__pre/*@@*/gemvT_a1_x1_b/*@@*/__BETA/*@@*/_y1(const int M, const 
+int N, const double alpha, const double *A, const int lda, const double *X, cons
+t int incX, const double beta, double *Y, const int incY)
+{
+   int i, j;                                            //@=>gemvDecl=Stmt
+   for (i = 0; i < M; i += 1)                           //@=>loopI=Loop BEGIN(gemvBody=Nest) BEGIN(nest2=Nest)
+   {
+     Y[i] = beta * Y[i];                                //@ =>stmt0=Stmt; BEGIN(nest1Wrap=Nest)
+     for (j = 0; j < N; j += 1)                         //@=>loopJ=Loop BEGIN(nest1=Nest)
+     {
+         Y[i] += A[i*lda+j] * X[j];                     //@ =>ExpStmt
+      }
+   }
+}
+\end {verbatim}
+}
+Each POET parsing annotation either starts with ``//@" and lasts until the line break, 
+or starts with ``/*@" and ends with ``@*/". The special syntax allows
+programmers to naturally treat these annotations
+as comments in C/C++ code, so that the source input  is readily accessible for 
+other uses.  For other languages such as Fortran, POET annotations can be embedded
+within comments of the underlying language. Note that the empty annotations ($/*@@*/$) in the above
+example serve merely to separate an input string into separate tokens. 
+
+POET supports two kinds of parsing annotations.
+\begin {itemize}
+\item {Single-line annotations.}
+A single-line annotation applies to a single line of program source.
+It has the format ``$=>$ T", where $T$ is a parse specification as defined in Section~\ref {sec-parseSpec}.
+For example,  the annotation `` int i, j;  //@$=>$gemvDecl=Stmt" indicates
+that  ``int i, j;" is a statement that should be parsed using the $Stmt$
+code template, and the result should be stored in the global variable $gemvDecl$.
+
+\item {Multi-line annotations.}
+Multi-line annotations are used
+to help parse compound language constructs such as functions and loop nests, 
+which may span multiple lines of the input code.
+Each multi-line annotation has the format ``BEGIN(T)" or ``; BEGIN(T)"
+where $T$ is a parsing specification (see Section~\ref{sec-parseSpec}).
+If there is a ``;" before the $BEGIN$ annotation, the parsing annotation refers to
+the source code immediately following the annotation; otherwise, it starts
+from the left-most position of the current line.
+For example, the annotation
+``for (l = 0; l $<$ K; l += 1) //@ $=>$loopL=Loop BEGIN(nest1=Nest)"
+includes a multi-line annotation which starts from the {\it for} loop (a 
+single-line annotated fragment stored in $loopL$).
+However, the ``/*@; BEGIN(gemv=FunctionDec) @*/" starts from the following line;
+that is,  it does not include source code at the same line as the annotation.
+In both cases, the relevant source code in the underlying language is parsed based on
+the given parsing specification ($nest1=Nest$ or $gemv=FunctionDecl$), and the parsing
+results are saved in the corresponding global variables.
+\end {itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%	
+\chapter {Expressions}
+\label {chap-exp}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%	
+
+POET expressions are the building blocks of all evaluations
+and could take any of the following forms.
+\begin {itemize}
+\item Atomic values, which include integers and strings. POET use integers to represent boolean values.
+\item Compound data structures, which include lists, tuples, associative maps, and code template objects.
+\item {\it Xform} routine handles, which are similar to function pointers in C. 
+\item Variables, which are place holders for  expression values.
+\item Invocation of POET {\it xform} routines, which are essentially calls to user-defined functions.
+\item Invocation of built-in POET operators, including both arithmetic operations and other 
+operations provided to support efficient code transformation.
+\end {itemize}
+Except for variables and associative maps, none of the other POET expressions can be modified.
+Transformations are performed by constructing new values to replace the old ones.
+POET provides a large collection of built-in operators, each of which takes one or more input operands, performs
+some internal evaluation, and returns a new value as result. These operations can be separated into the following categories.
+
+
+
+\section {Debugging Operations}
+POET provides the following operations to support debugging and error reporting. These operations produce side effects by printing out information and exiting the program if necessary.
+\subsection {The PRINT operator} 
+\label {sec-op-PRINT}
+The syntax for invoking the PRINT operator is
+\begin {verbatim}
+PRINT <exp> 
+\end {verbatim}
+The PRINT operator takes an arbitrary expression $<$exp$>$, prints out the value of $<$exp$>$ to standard error output, and returns an empty string ``" as result. 
+It can be used to print out the value of an arbitrary expression for debugging purposes. 
+The following shows some examples of using the {\it PRINT} operator.
+\begin {verbatim}
+PRINT("x=" x);
+PRINT("Warning: cannot resolve " cur_sub "-" cpstart 
+             ": permuteDim=" permuteDim "; left_offset = " left_offset);
+\end {verbatim}
+
+\subsection {The DEBUG operator} 
+\label {sec-op-DEBUG}
+The syntax for invoking the DEBUG operator is
+\begin {verbatim}
+DEBUG [ "["<int> "]"] "{" <exp> "}"
+\end {verbatim}
+The DEBUG operator takes an arbitrary expression $<$exp$>$ and prints out debugging
+information for evaluating $<$exp$>$ to standard error output.
+It prints out  and returns the result of $<$exp$>$. 
+The $<$int$>$ is used to control how many levels of {\it xform} routine
+invocations to debug. By default, $<$int$>$ is one, which means {\it xform}
+routines will be treated as regular expressions in debugging. If $<$int$>$
+is 2, then the debugger will step into each {\it xform} invocation within $exp$ once.
+The following shows some examples of using the {\it DEBUG} operator.
+\begin {verbatim}
+DEBUG {x = 56;}
+DEBUG [3] {UnrollLoops(inputCode)}
+\end {verbatim}
+
+\subsection {The ERROR Operator}
+The syntax for invoking the ERROR operator is
+\begin {verbatim}
+ERROR  <exp>
+\end {verbatim}
+The ERROR operator takes an arbitrary expression $<$exp$>$
+and prints out the value of  $<$exp$>$ as an error message to inform the user what has gone wrong before  quitting the entire POET evaluation. A line number and the file name that contains the ERROR invocation are also printed out to inform the location that the error has occurred.
+The ERROR operator therefore should be 
+invoked only when an erroneous situation has occurred and the POET program needs to exit. 
+The following shows some examples of using ERROR operator.
+\begin {verbatim}
+ERROR( "Expecting input to be a sequence: " input);
+RROR( "Cannot fuse different loops: " curLoop " and " pivotLoop);
+\end {verbatim}
+
+\section {Generic comparison of values}
+\label {sec-op-generic}
+\subsection {The == and != operators} 
+The syntax for invoking these binary operators are
+\begin {verbatim}
+<exp1> == <exp2>
+<exp1> != <exp2>
+\end {verbatim} 
+Both operators take two expressions, $<$exp1$>$ and $<$exp2$>$, and 
+return a boolean (integer) value indicating whether the two operands are equal or not equal respectively. 
+
+\subsection {Integer and String comparison}
+A number of binary operators, including $<$, $<=$, $>$, and $>=$, are provided to support comparison
+of two integer or string values. These operators
+have the same meaning as those in C. 
+
+\section {Integer Operations}
+\subsection {Integer arithmetics} 
+POET integer arithmetic operations include the following binary operators: +, -, *, /, \%, +=, -=, *=, \%=;
+and a single unary operator: -.  
+These operators have the same usage and meanings as those in C.
+
+\subsection {Boolean operations} 
+POET provides two binary boolean operators,  $\&\&$ and $||$, to support the conjunction and disjunction
+of boolean values respectively. It provides  a single unary operator, the $!$ operator, to support the 
+inversion of boolean values.
+
+\section {String operations} 
+
+\subsection {The string concatenation $\wedge$ operator}
+It applies to two operands, each of which is a string, an integer,  or a list of strings and integers, and compose the operands into a single string.
+For example,   ``abc"  $\wedge$ 3  $\wedge$  ``def" returns $``abc3def"$.
+Note that integer operands are automatically converted to strings when used in the concatenation.
+The $\wedge$ operator can also be applied to a list of strings, e.g. (``abc"  ``def") $\wedge$ 3 returns ``abcdef3".
+
+\subsection {The $SPLIT$ operator}
+The syntax for invoking the $SPLIT$ operator is
+\begin {verbatim}
+SPLIT "("<exp1> ","  <exp2>")"
+\end {verbatim}
+Here $<$exp2$>$ is an arbitrary input expression that may contain strings, and $<$exp1$>$ is 
+either a string that specifies the separator that should be used to split the strings in $<$exp2$>$,
+or an integer that specifies how many characters to count before splitting $<$exp2$>$ into two substrings. 
+If $<$exp1$>$ is an empty string, the POET internal tokenizer (lexical analyzer) will be invoked to split
+the given string. 
+The operation returns a list of  substrings obtained from splitting $<$exp2$>$.
+For example, 
+\begin {verbatim}
+SPLIT(1,"abc")        <<* result is "a" "bc"
+SPLIT(",",input)      <<* result is "bc" "," "ade" "," "lkd" NULL
+SPLIT("", "3,7+5")    <<* result is "3" "," 7 "+" 5 NULL 
+SPLIT(",",#(MyCodeTemplate,input)) 
+                      <<* result is MyCodeTemplate#("bc" "," "ade" "," "lkd" NULL)
+\end {verbatim}
+
+\section {List operations} 
+\label {sec-op-list}
+
+\subsection {List construction} 
+$List$ is the most commonly used data structure in POET. Building a list simply requires that the component expressions to placed together. 
+For example,  {\it (1 2 3)} builds a list that contains three elements: 1, 2, and 3.
+
+\subsection {The Cons Operator (::) }
+The syntax for invoking the $::$ operator is
+\begin {verbatim}
+<exp1> ::  <exp2>
+\end {verbatim}
+Here the operator returns a new list that 
+inserts $<$exp1$>$ before all elements in $<$exp2$>$.
+For example,  $``<=" :: b$ produces a list with 
+at least two elements, ``$<=$" and elements from b 
+(if b is a list, the result contains all elements in b; otherwise, the resulting list  
+contains b as an element). Because the type of b may be unknown, 
+the result may contain arbitrary numbers 
+of elements. 
+
+\subsection {List Access (The $car/HEAD$, $cdr/TAIL$, and {\it LEN} operators)}
+Elements in a list are accessed through two unary operators: $car$ (also known as {\it HEAD})
+and $cdr$ (also know as {\it TAIL}). The keywords $car$ and {\it HEAD} can be used interchangeably,
+so can $cdr$ and {\it TAIL}.
+The syntax for invoking the $car$ and $cdr$ operators are
+\begin {verbatim}
+car <exp>
+cdr <exp>
+\end {verbatim}
+Here the $car$ operator returns the first element of the list $<$exp$>$; 
+if $<$exp$>$ is not a list, it simply returns $<$exp$>$.
+The $cdr$ operator returns the tail of the list; if $<$exp$>$ is not
+a list, it returns the empty string ``".
+The following are some examples illustrating the use of these operators.
+
+\begin {verbatim}
+a1 = (3 4 5)    <<* returns 3 4 5 NULL
+a2= (1 2 a1)    <<* returns 1 2 (3 4 5 NULL) NULL
+a3=(1 2) :: a1  <<* returns(1 2 NULL) 3 4 5 NULL
+a4=1 :: 2 :: a1 <<* returns1 2 3 4 5 NULL
+HEAD(a2)        <<* returns1
+TAIL(a2)        <<* returns2 (3 4 5 NULL) NULL
+HEAD(a3)        <<* returns1 2 NULL
+TAIL(a3)        <<* returns3 4 5 NULL
+ \end {verbatim}
+ 
+ The syntax for invoking the {\it LEN} operator is
+ \begin {verbatim}
+ LEN <exp>
+ \end {verbatim}
+When given a list as operand, the {\it LEN} operator returns the number of elements within the list. 
+For example, {\it LEN(2 3 7)} returns 3, {\it LEN(2 7 ``abc" ``")}  returns 4.
+
+
+\section {Tuple operations} 
+\subsection {Tuple Construction (the ``," operator)}
+
+A tuples is composed by connecting 
+a predetermined number of elements with commas. 
+For example, ``i" , 0, ``m" , 1 produces a tuple t with four elements, 
+``i",0,``m", and 1. 
+All elements within a tuple must be explicitly specified when constructing the tuple,
+so tuples cannot be built dynamically (e.g., using a loop).
+
+\subsection {Tuple Access (The $[]$ and $LEN$ operators)}
+Tuples provide random indexed access to their elements.
+Each element in a tuple $t$ is accessed by invoking $t[i]$, where $i$
+is the index of the element being accessed (like C, the index starts from 0).
+For example, if $t$ = ($i,0,``m",1)$, then $t[0]$ returns ``i",
+$t[1]$ returns $0$, $t[2]$ returns ``m'', and $t[3]$ returns $1$.
+
+When given a tuple as operand, the $LEN$ operator returns the number of elements within the tuple. For example, $LEN(2,3,7) = 3$, $LEN(2, (``<" 3), 4) = 3$.
+
+\section {Associative Map operations} 
+
+\subsection {Map Construction (the {\it MAP} Operator)}
+POET uses associative maps to efficiently associate two arbitrary types of values. 
+The syntax for building an associative map using the {\it MAP} operator is the following.
+\begin {verbatim}
+MAP "(" <type1> , <type2> ")"
+\end {verbatim}
+Here $<$type1$>$ and $<$type2$>$ are two type specifiers as defined in Section~\ref {sec-typeSpec}.
+Each invocation of $MAP(type1,type2)$  returns a new empty table that maps values of $type1$ to values of $type2$.
+
+\subsection {Map Access (the $[]$ and $LEN$ operators)}
+
+The elements within an associative map can be accessed using the ``[]" operator and modified using assignments. 
+The following illustrates how to create and operate on associative maps.
+\begin {verbatim}
+   amap = MAP(_,_);
+   amap["abc"] = 3;
+   amap[4] = "def";
+   PRINT ("size  of amap is " LEN(amap)); 
+   foreach (amap :  (CLEAR from, CLEAR to) : FALSE) {
+       PRINT ("MAPPING " from "=>" to);
+   }
+   PRINT amap;
+\end {verbatim}
+The output of the above code is 
+\begin {verbatim}
+size  of amap is  2 . 
+amap[4] is  "def" . 
+amap[2] is  "" . 
+MAPPING  4 => "def" 
+MAPPING "abc" => 3 
+(4->"def","abc"->3)
+\end {verbatim}
+If a value $e$ is stored as a key in a mapping table $amap$, then $amap[e]$ returns the value associated with $e$ in $amap$; otherwise, an empty string is returned. 
+The size of a mapping table $amap$ can be obtained using 
+$LEN(amap)$. All the elements within a mapping table can enumerated using the built-in $foreach$ statement, where each entry within the table is placed into a pair of uninitialized variables. For more details about the $foreach$ statement, see Section~\ref {sec-stmt-foreach}.  
+
+\section  {Code Template Operations} 
+\label {sec-op-code}
+\subsection {Code Template Object Construction (the $\#$ operator)}
+POET treats each code template as a unique user-defined compound data type, where the template parameters are treated as data fields within the structure. To build an object of a code template, use the following syntax.
+\begin {verbatim}
+<id> "#" (<exp1>, <exp2>, ..., <expn>)
+\end {verbatim}
+where $<$id$>$ is the code template name. 
+For example, $Loop\#(``i",0,``N", 1)$ and $Exp\#(``abc / 2")$ build objects of two code templates named 
+$Loop$ and $Exp$ respectively.
+ 
+ \subsection {Code Template Access (the $[]$ operator)}
+ To get the values of individual data fields stored in a code template object, use syntax
+\begin {verbatim}
+<exp>[ <id1> . <id2>]
+\end {verbatim}
+where $<$exp$>$ is the code template object, $<$id1$>$ is the name of the code template type,
+and $<$id2$>$ is the name of the data field (i.e., the code template parameter) to be accessed. 
+For example, $aLoop[Loop.i]$ returns the value of the $i$ data field  in $aLoop$, which is a variable that contains a $Loop$ code template object. 
+Similarly, $aLoop[Loop.step]$ returns the value of the $step$ field in $aLoop$.
+If $aLoop$ contains value $Loop\#(``ivar", 5, 100,1)$, then $aLoop[Loop.i]$ returns value ``ivar",
+and $aLoop[Loop.step]$ returns value $1$.
+
+\section {Variable Operations}
+\label {sec-op-var}
+\subsection {Un-initializing Variables (The CLEAR operator)} 
+\label {sec-op-clear}
+The syntax for invoking the {\it CLEAR} operator is
+\begin {verbatim}
+CLEAR <id>
+\end {verbatim}
+where $<$id$>$ is the name of a variable. 
+The $CLEAR$ operator takes a single variable $v$ as parameter and clears
+the value contained in $v$ so that $v$ becomes uninitialized after the operation. The {\it CLEAR} operator is provided to better support pattern matching, where un-initialized variables are treated as place holders that can be matched against arbitrary components of a compound data structure. For example,  $input : Stmt\#(CLEAR\  content)$ will treat the uninitialized variable $content$ as a place holder and will assign a new value to it if the pattern matching succeeds. The {\it CLEAR} operator needs to be applied to all pattern variables if the pattern matching operation is inside a loop, because a pattern variable can stay uninitialized only in the first iteration of the loop. 
+ 
+\subsection {Variable assignment (the ``=" operator)}
+\label {sec-op-assign}
+
+  In POET, pattern matching can be used to assign values to un-initialized variables.  To modify variables already defined, regular variable assignment must be used, which has the following syntax. 
+ \begin {verbatim}
+ <lhs>  = <exp>
+ \end {verbatim}
+ Here $<$exp$>$ is an arbitrary expression, and $<$lhs$>$ has one of the following forms.
+ \begin {itemize}
+ \item A single variable. In this case,  the value of the $<$exp$>$ is assigned to $<$lhs$>$.
+ \item A compound data structure (e.g., a list, tuple, or code template) that contains variables as components.
+ In this case, the value of the $<$exp$>$ is matched against the data structure of the $<$lhs$>$,
+ and all the variables within $<$lhs$>$ are assigned with the necessary values to make the matching successful. 
+In contrast to the pattern matching operator,  all variables in $<$lhs$>$ are treated as uninitialized place holders in the assignment operation, and if the value of $<$exp$>$ fails to match the type specification in $<$lhs$>$, the evaluation exits with an error. 
+ \end {itemize} 
+ For example, after the following two assignments,
+  \begin {verbatim}
+     a = Stmt#input;
+    Stmt#a = a;
+ \end {verbatim}
+ the variable $a$ should have the same value as $input$.
+ 
+ 
+ \section {Delaying Evaluation of Expressions (the DELAY and APPLY operators)}
+ 
+ POET provides a pair of special operators, $DELAY$ and $APPLY$,  to support the delay of 
+ expression evaluations. Such delay is desired when the values for certain variables are yet unknown
+ and when constructing a pattern expression that contains un-initialized variables for pattern
+ matching (see Section~\ref {sec-pattern}).
+ These operations can be used to delay evaluation of an arbitrary
+ expression, whether the expression is local (inside a xform routine definition) or global (in the
+ global scope).
+ 
+ \subsection {The $DELAY$ operator}
+ \label {sec-op-DELAY} 
+ POET uses the $DELAY$ operator to save an expression in its original definition without evaluation.
+The delayed operations are in a way similar to  {\it xform} routines except they are defined and invoked using a different syntax (defined using the $DELAY$ operator and invoked using the {\it APPLY} operator), 
+they don't have parameters, and they can operate on global variables (when defined in the global scope) or local variables (when defined inside a $xform$ routine). 
+The syntax for defining a delayed expression is 
+\begin {verbatim}
+DELAY "{" <exp> "}"
+\end {verbatim}
+Specifically, the DELAY operator takes a single expression (which could potentially be a sequence of POET statements and expressions) and saves it for later evaluation.
+The result is the internal  representation of the saved expression. 
+The delayed operations can be stored into an arbitrary variable and could be used in all situations
+that a regular expression may be used.
+
+\subsection {The $APPLY$ operator}
+\label {sec-op-APPLY}
+
+To evaluate a delayed expression saved in an arbitrary variable, say $foo$, use operator {\it APPLY}. Specifically,  
+{\it APPLY} $foo$ will evaluate the operations stored in $foo$ and return the evaluation result.
+In this case, the $foo$ variable acts like a parameterless function that may operate on global
+variables, and the $APPLY$ operator serves to invoke the global function accordingly.
+ 
+ \section {Trace Operations}
+\label {sec-op-trace}
+POET supports a special kind of global variables called $trace$ handles, which can be embedded within
+internal representation of computations to trace transformations to fragments of code. 
+Once embedded inside an expression, $trace$ handles 
+become integral components of the expression value. 
+Transformations to an input code therefore can be implemented by simply modifying the values of trace handles within the computation. Note that when inside a $xform$ function, trace handles
+can modified on through built-in transformation operations, such as REPLACE, 
+defined in Section~\ref{sec-op-xform}.
+As various transformations are applied to the input code,
+these trace handles can be replaced
+with new values.
+The tracing capability makes the ordering of different code
+transformations extremely flexible, and one can easily adjust
+transformation orders as desired. 
+The following POET operations can be used to set up trace handles.
+
+\subsection {TRACE (x, exp)}
+Here $x$ is a single or a list of local/global variables.
+These variables become tracing handles during the evaluation of the
+$exp$ expression, so that they may be used to trace transformations
+performed by $exp$.
+For example, in the following evaluation in POET/test/gemmATLAS/gemmKernel.pt,
+\begin {verbatim}
+TRACE (Arepl, ScalarRepl[... traceRepl=Arepl;.... ](...))
+\end {verbatim}
+the global variable $Arepl$ is treated as a trace handle during the invocation of the {\it xform}
+routine $ScalarRepl$, so that the routine can modify $Arepl$ to contain the names of new variables created by the routine.
+
+\subsection {INSERT (x, exp)}
+\label {sec-op-insert}
+
+This operation inserts all trace handles rooted at $x$ 
+(trace handles that are declared together with $x$ in a single
+global trace handle declaration as defined in Section~\ref {sec-traceHandle})
+to be embedded within expression $exp$ if possible
+so that $x$ may be used to trace transformations within $exp$. 
+For example, the operation {\it INSERT}$(gemm,gemm)$ (used in POET/test/gemmATLAS/gemm.pt)
+inserts all the trace handles declared together with  
+$gemm$ into the expression contained in $gemm$, so that all the trace handles become 
+embedded within the internal representation of the input code.
+
+In order for a number of trace handles to be successfully inserted inside a computation, the trace handles 
+must have the correct values; that is, the values of the trace handles must indeed be part of the input 
+expression  to the {\it INSERT} operation.
+A special case of invoking the {\it INSERT} operation is {\it INSERT}$(tophandle, tophandle)$, where $tophandle$ is the first trace handle that was followed by a collection of other handles 
+declared together. Note for the {\it INSERT} operation to work, the trace handles
+ must have been declared in the save order as the order of encountering them in a pre-order traversal
+ of the input expression.
+
+\subsection {ERASE(x, exp)}
+Here $x$ is a single or a list of trace handles.
+This operation removes all the occurrences of trace handles in $x$ from the input expression $exp$; 
+that is, it returns a new expression that is equivalent to $exp$ but no longer 
+contains any trace handles in $x$. 
+For example, if $input = Stmt\#(x)$, where $x$ is a trace handle and contains value $3$, then
+\begin {verbatim}
+ERASE(x,input) returns Stmt#3
+\end {verbatim}
+
+As a special case, the invocation {\it ERASE}$(x,x)$, returns the value contained in the variable
+$x$ (i.e., the resulting value is no longer a trace handle).
+For example, if $x$ is a trace handle and $x = ``abc"$, then
+\begin {verbatim}
+ERASE(x) returns "abc".
+\end {verbatim}
+
+\subsection {COPY(exp) }
+While $ERASE(x, exp)$ explicitly specifies which trace handles to remove from the input expression $exp$,
+the operation {\it COPY}$(exp)$ replicates $exp$ with a copy that has no trace handles at all (i.e., all trace handles are removed). 
+For example, if $input = Assign\#(x, y)$, where both $x$ and $y$ are trace handles with values $``var"$
+and $4$ respectively, then
+\begin {verbatim}
+COPY(input) returns Assign#("var", 4)
+\end {verbatim}
+
+
+\subsection {SAVE (v1,v2,...,vm)}
+Here v1,v2, ..., vm is a tuple of trace handle names. This operation saves the current value of each trace handle v1,v2,...,vm so that the values of these trace handles can be restored later. 
+After a sequence of transformations to the trace handles are finished and the results output to an external file, the original values of the trace handles can be restored so that a new sequence of transformations can start afresh. 
+This operation therefore allows different transformations to be applied 
+independently to a single input code. 
+
+\subsection {RESTORE (v1, v2, ..., vm)}
+Here v1,v2, ..., vm is a tuple of trace handle names. 
+This operation restores the last value saved for the trace handles $v1,...,vm$. 
+The $SAVE$ and $RESTORE$ operations are usually used together for saving and restoring
+information relevant to trace handles. Both the $SAVE$ and $RESTORE$ operations return
+the empty string as result.
+
+\section {Transformation Operations}
+\label {sec-op-xform}
+POET provides several built-in operations, including replication, permutation, and replacement of code fragments,  to efficiently apply a wide variety of transformations to input computations. All built-in operations support the update of $trace$ handles embedded within the input computation; that is,
+each trace handle embedded within the input will be modified to contain the transformation result 
+of its original value. 
+Note that except for modifying trace handles,  all built-in operations return their transformation results
+without any other direct modification to the input computation. 
+
+\subsection {DUPLICATE(c1,c2,input)}
+Here $c1$ is a single expression, $c2$ is a list of expressions, and $input$ is the computation to transform. This operation replicates $input$ with multiple copies, each copy replacing the code fragment $c1$ in $input$ by a different component in the list $c2$. It returns a list of $input$ duplicates as result. 
+For example,
+\begin {verbatim}
+   input = Stmt#"var";
+   PRINT ("DUPLICATE(\"var\", (1 2 3), input) = " DUPLICATE("var", (1 2 3), input));
+\end {verbatim}
+produces the following output.
+\begin {verbatim}
+DUPLICATE("var", (1 2 3), input) =  Stmt#1 Stmt#2 Stmt#3 NULL
+\end {verbatim}
+
+\subsection {PERMUTE(config,input)}
+Here $input$ is a list of expressions, and $config$ is a list of integers that specify the index of permutation location for each component in $input$.
+This operation reorders elements in the $input$ list based on $config$, which defines a position for each element in $input$.
+For example,
+\begin {verbatim}
+PERMUTE((3 2 1), ("a" "b" "c")) returns ("c" "b" "a")
+\end {verbatim}
+
+\subsection {REBUILD(exp)} 
+This operation takes a single POET expression $exp$ and returns the result of 
+rebuilding $exp$. Here the rebuilding process will invoke the $rebuild$ attribute defined for each 
+code template (see Section~\ref {sec-code-attr}) and will eliminate obvious redundancies (e.g., empty strings) 
+in $exp$.
+
+\subsection {REPLACE(c1,c2,input)}
+Here $input$ is the input computation to transform, $c1$ is an expression embedded within $input$, 
+and $c2$ is the new expression to replace $c1$, 
+This operation replaces all occurrences of the code fragment $c1$ in $input$ with $c2$. 
+For example, 
+\begin {verbatim}
+REPLACE("x","y",SPLIT("","x*x-2"))  returns  "y" "*" "y" "-" 2 NULL
+\end {verbatim}
+
+\subsection {REPLACE(config, input)}
+Here $input$ is the input computation to transform, and $config$ is a list of pairs in the format
+of $(orig, repl)$, where $orig$ is an expression embedded within $input$, and $repl$ is the expression
+to replace $orig$. This operation traverses the $input$ to locate the $orig$ component of each pair 
+in $config$  and replaces each $orig$  with $repl$ in $input$.
+Each $(orig,repl)$ pair in $config$ is expected to be processed exactly once,
+in the order of their appearances in $config$,  during  a pre-order traversal of the $input$.
+If there is any pair never processed in $config$, the rest of the specifications in $config$ will be 
+ignored, and a warning is issued.
+For example
+\begin {verbatim}
+REPLACE( (("a",1) ("b",2) ("c",3)), Bop#("+","a",Bop#("-","b","c"))) 
+    =  Bop#("+",1,Bop#("-",2,3))
+\end {verbatim}
+
+\section {The Conditional Expression (The ``?:" operator)}
+POET supports conditional evaluation of expressions using the following syntax (same as C).
+\begin {verbatim}
+<cond> ? <exp1> : <exp2>
+\end {verbatim}
+Here the $<$cond$>$ expression is first evaluated, which should return a boolean (integer value).
+If the return value of $<$cond$>$ is true, the result of evaluating $<$exp1$>$ is returned; otherwise,
+the result of evaluating $<$exp2$>$ is returned.
+
+%%%%%%%%%%%%%%
+\chapter {Statements}
+\label {chap-stmt}
+
+In POET, statements are considered special expressions whose results may be ignored when composed into a sequence. For example, when a collection of statements $s_1,s_2,...,s_m$ is
+composed into a sequence, the evaluation results of the previous $s_1,s_2,...,s_{m-1}$ statements
+are thrown away, and only the result of the last statement is returned. 
+In contrast, when a collection of expressions $e_1,e_2,...,e_m$ is composed into a sequence,
+the evaluation result is a list that contains the result of all expressions $e_1,e_2,...,e_m$ as components
+(in POET, when expressions are simply listed together, they are considered operands in a list construction operation. See Section~\ref {sec-list}).
+
+POET statements serve to provide  
+control flow support such as sequencing of evaluation, 
+conditional evaluation,  loops, and early returns from xform routines. 
+
+\section {Single Statements}
+
+\subsection {The Expression statement}
+The syntax for the expression statement is
+\begin {verbatim}
+<exp> ;
+\end {verbatim}
+An expression statement is composed by following any POET expression with a semicolon (i.e., ``;").
+If an expression is followed by a ``;", its evaluation result is always an empty string,
+and the result is ignored when composed with other statements.
+Expression statements are used to support sequencing of statements --- that is, only the result of
+the last expression is returned, and the results of all previous evaluations are ignored.
+
+
+\subsection {The RETURN statement}
+The syntax for the RETURN statement is
+\begin {verbatim}
+RETURN <exp> ;
+\end {verbatim}
+The RETURN statement must be inside a $xform$ routine definition (a runtime error is raised
+otherwise). When being evaluated, it exits the $xform$ routine with the result of $<$exp$>$ as
+the result of the $xform$ routine call. The RETURN statement is provided to allow convenient
+early returns from a function call.
+
+\subsection {Statement Block}
+\label {sec-stmt-block}
+The syntax for a statement block is
+\begin {verbatim}
+{ stmt1  stmt2  ... stmtm }
+\end {verbatim}
+Here $stmt1,stmt2,...,stmtm$ are a sequence of statements. So a statement block merely combines a sequence of statements into a single one. The value of the statement block is the value of the last statement $stmtm$.
+
+\section {Conditionals}
+\subsection {The If-else Statement}
+
+The syntax for the {\it if-else} statement is
+\begin {verbatim}
+if ( <cond> )  <stmt1>  [ else  <stmt2> ]
+\end {verbatim}
+Here $<$cond$>$ is a POET boolean expression, and $<$stmt1$>$ and $<$stmt2$>$ are 
+single statements (including statement blocks). 
+If $<$cond$>$ evaluates to $true$ (a non-zero integer), $<$stmt1$>$
+is evaluated, and the value of the last expression in $<$stmt1$>$ is returned; 
+otherwise, $<$stmt2$>$ is evaluated, and the value of the last expression in $<$stmt2$>$ is returned. 
+If $<$cond$>$ evaluates to $false$ and the $else$ branch is missing, then an empty string is returned as result of evaluation. 
+
+\subsection {The Switch Statement}
+
+The syntax for the {\it switch} statement is
+\begin {verbatim}
+switch (<cond>) 
+{
+case <pattern1> : <stmts1>
+case <pattern2> : <stmts2>
+......
+case <patternm> : <stmtsm>
+[ default :  <default_stmts> ]
+}
+\end {verbatim}
+Here $<$cond$>$ is an arbitrary expression, $<$pattern1$>$,$<$pattern2$>$,..., $<$patternm$>$
+are pattern specifications as defined in Section~\ref {sec-pattern}, and $<$stmts1$>$,$<$stmts2$>$,...,$<$stmtsm$>$ and $<$default\_stmts$>$ are sequences of statements or expressions. 
+The switch statement first evaluates $<$cond$>$ and then matches the result of $<$cond$>$ against
+each pattern specification in order. Specifically, if $<$cond$>$ : $<$pattern1$>$ succeeds, then $<$stmts1$>$ is evaluated and the result of $<$stmts1$>$ becomes the result of the switch statement; otherwise, the result of $<$cond$>$ is matched against $<$pattern2$>$, and so forth. If none of the
+patterns can successfully match the value of $<$cond$>$, the $<$default\_stmts$>$ is evaluated and returned as result. If no pattern matching succeeds and no default statements are specified (the default branch is optional), an error message is issued.
+
+Note that when evaluating the switch statement, only one pattern will 
+be successfully matched with the given $<$cond$>$ throughout the evaluation. 
+Once a pattern matching succeeds, 
+the corresponding statements are evaluated and the result is returned immediately (no statements in the following patterns will be evaluated). If two patterns need to be combined,
+they should be combined into a single pattern specification using the $|$ operator, shown in Section~\ref {sec-pattern}.
+
+The $switch$ statement syntax is equivalent to the following syntax using if-else statements.
+\begin {verbatim}
+var = <cond>;
+if (var : <pattern1>)  { <stmts1> }
+else if (var : <pattern2>) { <stmts2> }
+......
+else if (var : <patternm>) { stmtsm> }
+[else { <default_stmts> } ]
+\end {verbatim}
+
+\section {Loops}
+\subsection {The {\it for} Loop}
+The syntax of the $for$ loop is as the following.
+\begin {verbatim}
+for ( <init> ; <cond> ; <incr>)  
+     <body>
+\end {verbatim}
+Here $<$init$>$ and $<$incr$>$ are arbitrary expressions, $<$cond$>$ is a boolean expression, and $<$body$>$ is a single statement (could be a statement block) that comprises the loop body.
+%The $for$ loop has the same syntax and semantics as the {\it for} loop in the C language.
+First, the $<$init$>$ expression is evaluated to initialize the loop. Then, $<$cond$>$ is evaluated.
+If $<$cond$>$ returns TRUE, $<$body$>$ and $<$incr$>$ are evaluated, and $<$cond$>$ 
+is evaluated again to determine whether to repeat the evaluation of $<$body$>$ and $<$incr$>$.
+
+As example, the following loop prints out each element contained within a list $input$.
+\begin {verbatim}
+for (p_input = input; p_input != ""; p_input = TAIL(p_input)) {
+    PRINT ("seeing element: " HEAD(p_input));
+}
+\end {verbatim}
+
+\subsection {The  {\it foreach} Loop}
+\label {sec-stmt-foreach}
+The syntax of the $foreach$ loop is
+\begin {verbatim}
+foreach (<exp> : <pattern> : <succ> )
+    <body>
+\end {verbatim}
+Here $<$exp$>$ is the an arbitrary expression, $<$pattern$>$ is a pattern specification as defined in Section~\ref {sec-pattern},  $<$succ$>$ is a boolean expression, and $<$body$>$ is a single statement (or a statement block). The $foreach$ statement traverses the input computation $<$exp$>$ 
+and matches each component contained in $<$exp$>$ against the pattern specification $<$pattern$>$.
+If any pattern matching succeeds for a code fragment $sub\-exp$ in $<$exp$>$, it will evaluate the $<$body$>$ statement and the $<$succ$>$ expression. If $<$succ$>$ evaluates to true (non-zero), the current $sub\-exp$ will be skipped, and the code fragment following $sub\-exp$ will be traversed next; otherwise, the foreach loop will continue traversing the $sub\-exp$ expression in order to find additional matches. 
+The foreach statement therefore serves as the built-in operation for collectively applying  pattern matching analysis to an input computation. 
+
+Note that in order to process each fragment that matches a given pattern, the $<$pattern$>$ specification needs to contain local variables that will be assigned with the matched fragment
+when the matching succeeds. The following example illustrates how to print out all the loop controls inside an $input$ computation.
+\begin {verbatim}
+foreach (input : (curLoop = Loop) : TRUE) 
+{
+  PRINT ("found a loop: " curLoop);
+}
+\end {verbatim}
+Note that the expression $curLoop=Loop$ must be enclosed inside a pair of 
+parentheses because the assignment operator has lower precedence than the $:$
+operator.
+The following loop collects all the loop nests within an $input$ computation. 
+\begin {verbatim}
+loopNests = "";
+foreach (input : (curNest = Nest) : FALSE) 
+   loopNests = BuildList(curNest, loopNests);
+\end {verbatim}
+Here because loop nests may be inside each other, the $<$succ$>$ parameter of the foreach loop is set to {\it FALSE} so that the pattern matching will continue inside already located loop nests. 
+Note that each foreach loop makes a traversal over the entire input. 
+It is recommended to use the foreach loop to collect information only. If the input computation needs to be transformed, it is better to invoke a {\it REPLACE} operation (see Section~\ref {sec-op-xform}) after a foreach loop has finished, as the transformation operations may disrupt the traversal by the {\it foreach} loop.
+
+\subsection {The {\it foreach\_r} Loop}
+
+The {\it foreach\_r} Loop has the following syntax. 
+\begin {verbatim}
+foreach_r (<exp> : <pattern> : <succ> )
+    <body>
+\end {verbatim}
+The {\it foreach\_r} loop essentially has the same syntax and semantics as the {\it foreach} loop, except that
+it traverses the input $<$exp$>$ in the reverse order of the traversal by the corresponding {\it foreach} loop.
+The different traversing order allows the relevant information to be gathered and saved with more flexibility.
+For example, the following code
+\begin {verbatim}
+loopNests = "";
+foreach_r (input : (curNest = Nest) : FALSE) 
+   loopNests = BuildList(curNest, loopNests);
+\end {verbatim}
+collects all the loop nests inside $input$ and saves the loop nests in a list in the same order of their 
+appearances in the original code. In contrast, the almost identical loop in Section~\ref {sec-stmt-foreach}
+saves all the loop nests in the reverse order of their appearances in $input$.
+
+\subsection {The BREAK and CONTINUE statements}
+Just like the $break$ and $continue$ statements in C, POET provides $break$ and $continue$ statements to jump to the continuation and exit of a loop. The syntax for both statements are
+\begin {verbatim}
+BREAK
+CONTINUE
+\end {verbatim}
+These two statements have the same meaning as those in C, and can be used to break out of (or back to the start) of {\it for, foreach}, and {\it foreach\_r} loops.
+
+\newpage
+\addcontentsline{toc}{section}{Append A. Context-free grammar of the POET language}
+\appendix 
+\begin {center}
+{\bf \Large Appendix A.  Context-free grammar of the POET language}
+\end {center}
+\begin {verbatim}
+poet :  commands ; 
+commands :  commands command | ;
+
+command :  "<" "parameter" ID  paramAttrs "/>"
+    | "<" "define" ID exp "/>"
+    | "<" "eval" exp "/>"
+    | "<" "trace" traceVars "/>"
+    | "<" "input" inputAttrs inputRHS
+    | "<" "output" outputAttrs "/>"
+    | "<" "code" ID codeAttrs codeRHS
+    | "<" "xform" ID xformAttrs xformRHS
+
+paramAttrs :  paramAttrs paramAttr | ;
+paramAttr : "type" "=" typeSpec  | "default" "=" expUnit
+    |  "parse" "=" parseSpec  |  "message" "=" STRING
+traceVars : ID |  traceVars "," traceVars
+inputAttrs : inputAttr inputAttrs  | ;
+inputAttr : "debug" "=" expUnit  |  "annot" "=" expUnit  |  "cond" "=" expUnit
+    |  "syntax" "=" expUnit  |  "parse" "=" "POET"  |  "parse" "=" parseSpec
+    |  "from" "=" expUnit   |  "to" "=" ID  |  "to" "=" "POET"
+inputRHS : ">" inputCodeList "</input>"  |  "/>"
+inputCodeList : inputCode | inputCode inputCodeList
+
+outputAttrs : outputAttr outputAttrs  | ;
+outputAttr :   "cond" "=" expUnit  |   "syntax" "=" expUnit 
+    |   "from" "=" expUnit   |  "to" "="  expUnit
+codeAttrs :  codeAttrs codeAttr | ;
+codeAttr : "pars" "=" "(" codePars ")"  | ID "=" typeSpec
+    | "cond" "=" expUnit  | "rebuild" "=" expUnit
+    | "parse" "=" parseSpec  | "output" "=" typeSpec
+    | "lookahead" "=" INT  |  "match" "=" typeSpec
+codeRHS : ">" exp "</code>   |   "/>"
+xformAttrs : xformAttrs xformAttr  |   ;
+xformAttr: "pars" "=" "(" xformPars ")" | "output" "=" "(" xformPars ")"
+    |  ID "=" typeSpec  
+xformRHS : ">" exp "</xform>"  |  "/>"
+codePars :  ID  | ID ":" parseSpec  | codePars "," codePars 
+xformPars : ID | ID ":" typeSpec | xformPars "," xformPars
+
+typeSpec :  INT  |  STRING  |  "_" |  ID
+    | "INT" | "STRING"  | "ID"  |  "VAR" | "CODE"  |  "XFORM"  |  "TUPLE" 
+    | "MAP" "(" typeSpec "," typeSpec ")" |  "EXP" 
+    | typeSpec "..." | typeSpec "...." 
+    | typeSpec ".." typeSpec  | ID "#" typeSpec  
+    | "(" typeList ")"  |  "(" typeTuple ")"  
+    | typeSpec "|" typeSpec | "~" typeSpec
+    | typeSpec "+" typeSpec | typeSpec "-" typeSpec | typeSpec "*" typeSpec
+    | typeSpec "/" typeSpec | typeSpec "%" typeSpec | typeSpec "::" typeSpec
+typeList :  typeSpec  |  typeSpec typeList
+typeTuple :  typeSpec "," typeSpec  |  typeTuple "," typeSpec
+
+patternSpec : typeSpec | "CLEAR" ID
+     | "(" patternSpecList ")" | "(" patternSpecTuple" ")"  |  patternSpec "|" patternSpec
+     |  ID "[" xformConfig "]"  | ID "#" patternSpec | ID "=" patternSpec               
+patternSpecList :  patternSpec patternSpec | patternSpec patternSpecList
+patternSpecTuple :  patternSpec "," patternSpec | patternSpecTuple "," patternSpecTuple
+
+parseSpec : typeSpec 
+    | "TUPLE" "(" parseSpecList ")"  | "LIST" "("  parseSpec ","  singleType ")"
+    | "(" parseSpecList ")" | "(" parseSpecTuple" ")"  |  parseSpec "|" parseSpec
+    |  ID "[" xformConfig "]"  | ID "#" parseSpec
+    | ID "=" parseSpec               
+parseSpecList :  parseSpec parseSpec | parseSpec parseSpecList
+parseSpecTuple :  parseSpec "," parseSpec | parseSpecTuple "," parseSpecTuple
+xformConfig : ID "=" parseSpec  | xformConfig ";" xformConfig
+
+exp : expUnit | exp exp | exp "::" exp | exp ","  exp
+    | "car" expUnit | "cdr" expUnit | "HEAD" expUnit | "TAIL" expUnit | "LEN" expUnit
+    | "ERROR" expUnit  |  "PRINT" expUnit  
+    |  DEBUG "[" INT "]" "{" exp "}"  |  DEBUG "{" exp "}"
+    | exp "=" exp  | exp "+=" exp | exp "-=" exp 
+    | exp "*=" exp | exp "/=" exp | exp "%=" exp
+    | exp "=>" parseSpec | exp "==>" parseSpec
+    | exp "?" exp ":" exp
+    | exp "&&" exp | exp "||" exp | "!" exp  | exp "|" exp
+    | exp "<" exp | exp "<=" exp | exp "==" exp
+    | exp ">" exp | exp ">=" exp | exp "!=" exp
+    | exp ":" patternSpec | "-" exp
+    | exp "+" exp | exp "-" exp | exp "*" exp | exp "/" exp | exp "%" exp
+    | exp "^" exp     | "SPLIT" "(" exp "," exp ")"
+    | "REPLACE" "(" exp "," exp ")" | "REPLACE "(" exp "," exp "," exp ")"
+    | "PERMUTE" "(" exp "," exp ")"  | "DUPLICATE" "(" exp "," exp "," exp ")"  
+    | "COPY" expUnit  |  "REBUILD" expUnit
+    | "ERASE" "(" exp "," exp ")" | INSERT "(" exp "," exp ")"
+    | "DELAY" "{" exp "}"  |  "APPLY" expUnit  | "CLEAR" expUnit  
+    | "SAVE" expUnit  |  "RESTORE"  expUnit  | "TRACE" "(" exp "," exp ")"
+    | expUnit "..." | expUnit "...." | expUnit ".." expUnit | "MAP" "(" typeSpec "," typeSpec ")"
+    | exp "[" exp "]"  |  exp "#" expUnit
+    | stmt
+
+stmt:  exp ";" | "{" exp "}"  |  "RETURN" expUnit
+    | "if" "(" exp ")" stmt  |  "if" "(" exp ")" stmt "else" stmt
+    | "switch" "(" exp ")" "{" cases "}"
+    | "for" "(" exp ";" exp ";" exp ")" stmt
+    | "foreach" "(" exp ":" patternSpec ":" exp ")" stmt
+    | "foreach_r" "(" exp ":" patternSpec ":" exp ")" stmt
+    | "CONTINUE"  |  "BREAK"   
+
+expUnit: "(" exp ")" | ID | "XFORM" | "CODE" | "TUPLE" | "STRING" | "INT" | "VAR"
+    | INT | STRING | "_"
+
+cases : cases "case" patternSpec ":" exp
+    |  cases "default" ":" exp
+    | "case" patternSpec ":" exp
+
+\end {verbatim}
+\printindex
+
+
+\end{document}
+
+%The body of the code template defines the concrete syntax of the code template
+%in the {\em source langauge} (e.g., C/C++/Java).
+%Similarly the $Nest$ declaration defines a code template named $Nest$. The code template has two parameters,
+%$loop$ and $body$ respectively, and the concrete syntax of the code template is a loop nest
+% formed by concatenating the values of $loop$ and $body$ in C syntax. 
+%Inside the code template body,  the parameter names are wrapped 
+%inside pairs of \@ symbols to signal that they are part of the POET language instead of
+%strings in the source language. The concrete syntax of the parameters $loop$ and $body$
+%are defined by code templates $Loop$ and $StmtList$ respectively.
+
+%In summary, each code template definition starts with its name followed with a number of attribute definitions. Each code template may have a number of special
+%attributes. For example,  the $pars$ attribute  defines the parameters of the code template;
+%the $rebuild$ attribute defines how to reconstruct the code template when it
+%is used as argument to a $REBUILD$ operation; and the $parse$ attribute defines
+%a parsing function for recognizing the code template from an input code.
+%Each code template can have a body, which is wrapped inside the pair of {\em $<$code ...$>$} 
+%and $<$/code$>$ tags. 
+%The body of each code template defines a concrete
+%syntax in the source language in terms of how to combine the template parameters. The entire 
+%code template body is treated as source strings in the source language (e.g., C, C++, or Java)
+%unless they are wrapped inside a pair of \@ symbols, which signals a POET expression
+%embedded inside the source language.
+
+%Code templates may be declared without a body. These templates merely serve
+%as definitions of special-purpose data structures and cannot be used in parsing/code generation
+%unless a body is subsequently defined.
+%Each code template may additionally declare optional 
+%attributes that represent additional semantic properties of the template 
+%objects. 
+%Code template as shown in Figure~\ref{fig-lang}
+%can be used to define both the concrete and abstract syntax of the input
+%source language. Specifically, they can be used to parse the input source code,
+%to build an abstract syntax tree (AST) of the input code, to allow type safe
+%transformations to the AST, and to emit the final transformed code.
+%Each code template conveys a special meaning that could be expressed
+%in different concrete syntax, for example, a loop could be expressed 
+%as ``for (int i = 0; i $<$ 100; ++i)" in C syntax or expressed as 
+%``DO I = 0,100" in Fortran syntax. 
+
+%As shown in the figure, POET uses the keyword {\it xform} to define a xform routine.
+%Each {\it xform} routine uses the $pars$ attribute to define a sequence of input parameters,
+% uses additional attributes to define optional parameters of 
+%the transformation (each optional parameter has a default value),
+%and uses the $output$ attribute to define a tuple of return values.
+%More than one results may be returned when the $output$ attribute is defined. 
+
+%Note that in POET, unless a $RETURN$ statement is encounted, 
+%the last expression evaluated within a transformation
+%routine is returned as the result of the routine. 
+%In Figure~\ref {fig-xform}, the $BuildList$ routine takes two parameters, $first$
+%and $rest$, and composes them into a $list$ (a built-in data structure) as result. 
+%The routine uses the ``$cond$? $true\_branch$ : $false\_branch$"
+%expression, which has the same syntax and semantics as the corresponding C conditional expression,
+%to check whether $first$ or $rest$ is empty. If either one of the input parameters is empty (equals to the empty string), the non-empty component is returned as result; otherwise, a list
+%that contains both components is returned.
+
+%A POET input specification, as illustrated in Figure~\ref {fig-kernel-dgemm},
+%is used to define the input computation to transform.
+%The input code defined in the specification will be parsed and translated
+%into an internal code template representation based on the included language specialization.
+%As shown in Figure~\ref {fig-kernel-dgemm}, each input specification is wrapped inside
+%a pair of $input$  tags, and the parsed internal representation
+%is stored in the global variable defined as the value of the $to$ attribute
+%(in Figure~\ref {fig-kernel-dgemm}, the parsed code is stored in a global variable named $gemm$),
+%the language specialization is defined using the $syntax$ attribute, and the code template type
+%of $gemm$ is defined using the $type$ attribute.
+%The source of the input code could then follow (the input code could alternatively be read
+%from a separate file, see Section~\ref {sec-global-input}). 
+%In Figure~\ref {fig-kernel-dgemm},  the source of the input code is annotated with information  
+%to help parse the matrix computation and to define values of global trace variables (e.g., 
+%$gemmDecl$, $loopJ$, $nest1$, $nest2$, $nest3$). 
+%Many of the annotations could be optionally omitted. 
+%In general, the more annotations are included in the source input, the shorter time it will
+%take the POET interpreter to parse the input code.
+%The POET input parser uses the recursive descent algorithm to decompose the input
+%code into code templates --- it is designed to be highly flexible for parsing arbitrary languages 
+%but is not designed to be particularly efficient. 
+
+%each POET annotation either starts with ``//@" and lasts until the line break, 
+%or starts with ``/*@" and ends with ``@*/". The special syntax allows
+%programmers to embed these annotations
+%as comments in C/C++ code, so that the source input  is readily accessible for 
+%other uses.
+
+%POET supports both single-line and nested annotations.
+%A single-line annotation starts from the start of the current line
+%and ends with an annotation in the format ``$=>$ [x = T]" or simply ``$=>$ T", 
+%where  x is the name of a global variable that will be used to store
+%the result of parsing the code fragment, 
+%and $T$ is the name of the code template that should be used to parse the annotated code.
+%For example, in Figure~\ref{fig-kernel-dgemm}, 
+%the annotation `` int i, j, l;  //@$=>$[gemmDecl=Stmt]" indicates
+%that  ``int i, j, l;" is a statement that should be parsed using the $Stmt$
+%template, and the result should be stored in the global variable $gemmDecl$.
+%The definitions for both $Exp$ and $Stmt$ can be found in 
+%Figure~\ref {fig-lang}.
+
+%In contrast to single-line annotations, nested annotations in POET are used
+%to help parse nested language constructs such as functions and loop nests,
+%which include other code fragments as components. 
+%Each nested POET annotation starts with ``BEGIN(x)", 
+%where x is the variable that
+%should be used to store the compound code template, and ends with ``END(x:T)",
+%where $T$ is the name of the code template that should be used to parse
+%the annotated code. In Figure~\ref {fig-kernel-dgemm}, the annotation
+%``for (l = 0; l $<$ K; l += 1) //@ $=>$loopL:Loop BEGIN(nest1) ... END(nest1)"
+%is a nested annotation which starts with the {\it for} loop (a singly annotated
+%fragment stored in $loopL$) and ends after parsing the loop body $stmt1$.
+%Other nested annotations in Figure~\ref{fig-kernel-dgemm} include code
+%fragments stored in $gemmBody$,$nest3$, $nest2$,etc. 
+%The special nested annotation ``BEGIN(PARSE) ... END(PARSE)" 
+%indicates that the built-in POET expression parser should be used to parse
+%the enclosed code fragment, where appropriate code templates for parsing
+%have been pre-defined in the language specialization of POET.

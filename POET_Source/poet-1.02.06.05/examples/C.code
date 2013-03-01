@@ -1,0 +1,278 @@
+
+
+<define BACKTRACK TRUE />
+
+<define TOKEN ((">""=") ("<""=") ("=""=") ("!""=") ("&""&") ("|""|") 
+("/""*") ("*""/")) />
+
+<code ExprMultiplicative />
+<code ExprMultiplicative_ />
+
+<code ExprAdditive_ />
+
+<code IndexList1 />
+
+<code LogicalAndExpr_ />
+<code LogicalOrExpr_ />
+<code AssignmentExpr />
+
+<code Expr />
+<code Stmt />
+<code Stmts />
+
+<code DeclaratorIdList />
+
+
+
+
+<********************Expr**********************************>
+
+<code Bop pars=(op : STRING, opd1: Expr, opd2: Expr)>
+(opd1 op opd2)
+</code>
+
+<code Uop pars=(op : STRING, opd1: Expr)>
+(op opd1)
+</code>
+
+
+
+
+<xform F pars=(inh, content)>
+switch (content){
+case CODE.ExprAdditive_sum#(opd2, rest): F(Bop#("+", inh, opd2), rest)
+case CODE.ExprAdditive_sub#(opd2, rest): F(Bop#("-", inh, opd2), rest)
+case "" : inh
+case CODE.ExprMultiplicative_mul#(opd2, rest): F(Bop#("*", inh, opd2), rest)
+case CODE.ExprMultiplicative_div#(opd2, rest): F(Bop#("/", inh, opd2), rest)
+case CODE.ExprAdditive_#(v1): F(inh, v1)
+
+case CODE.LogicalOrExpr_1#(opd2, rest): F(Bop#("||", inh, opd2), rest)
+case CODE.LogicalAndExpr_1#(opd2, rest): F(Bop#("&&", inh, opd2), rest)
+
+
+
+}
+</xform>
+
+<*************Array************>
+
+<code Index pars=(expr : Expr) rebuild=(expr)>
+[ @expr@ ]
+</code>
+
+<code IndexList pars=(content : IndexList1 | "") rebuild=(content)>
+@content@
+</code>
+
+<code IndexList1 pars=(index : Index, indexList : IndexList)>
+@index@ @indexList@
+</code>
+
+<code ArrayId pars=(id : ID, indexList : IndexList)>
+@id@ @indexList@
+</code>
+
+<*************Array************>
+
+<code FCONST1 pars=(val:INT) rebuild=(val".0")> @val@. </code>
+<code FCONST2 pars=(val:INT) rebuild=("0."val)> .@val@ </code>
+<code FCONST3 pars=(val1:INT, val2:INT) rebuild=(val1"."val2)> @val1@.@val2@ </code>
+<code FCONST4 pars=(base:FCONST1|FCONST2|FCONST3, expo:"e"|"E", factor:INT) rebuild=(base expo factor)> @base@ @expo@ @factor@</code>
+<code FloatLiteral pars=(content:(FCONST4|FCONST3|FCONST2|FCONST1)) > @content@ </code>
+
+
+<code ExprParenthesis pars=(expr : Expr) rebuild=expr>
+( @expr@ )
+</code>
+
+
+<code Term pars=(content : ArrayId | FloatLiteral | INT | ExprParenthesis) rebuild=(content)>
+@content@
+</code>
+
+
+
+<code UnaryOperator pars=(content : "!" | "-" | "+" | "") rebuild=(content)>
+@content@
+</code>
+
+<code UnaryExpr1 pars=(unaryOperator : UnaryOperator, term : Term) rebuild=((unaryOperator =="" )? term : Uop#(unaryOperator, term))>
+@unaryOperator@ @term@
+</code>
+
+<code UnaryExpr pars=(content : UnaryExpr1 | Term) rebuild=(content) >
+@content@
+</code>
+
+
+
+<code ExprMultiplicative_div pars=(unaryExpr : UnaryExpr, exprMultiplicative_ : ExprMultiplicative_)>
+/ @unaryExpr@ @exprMultiplicative_@
+</code>
+
+<code ExprMultiplicative_mul pars=(unaryExpr : UnaryExpr, exprMultiplicative_ : ExprMultiplicative_)>
+* @unaryExpr@ @exprMultiplicative_@
+</code>
+
+<code ExprMultiplicative_ pars=(content: ExprMultiplicative_mul | ExprMultiplicative_div | "") rebuild=(content)>
+@content@
+</code>
+<code ExprMultiplicative pars=(unaryExpr : UnaryExpr, exprMultiplicative_ : ExprMultiplicative_) rebuild=(XFORM.F(unaryExpr, exprMultiplicative_))>
+@unaryExpr@ @exprMultiplicative_@
+</code>
+
+
+<code ExprAdditive_sub pars=(exprMultiplicative : ExprMultiplicative, exprAdditive_ : ExprAdditive_)>
+- @exprMultiplicative@ @exprAdditive_@
+</code>
+
+<code ExprAdditive_sum pars=(exprMultiplicative : ExprMultiplicative, exprAdditive_ : ExprAdditive_ ) >
++ @exprMultiplicative@ @exprAdditive_@
+</code>
+
+<code ExprAdditive_ pars=(content : ExprAdditive_sum | ExprAdditive_sub | "")>
+@content@
+</code>
+
+<code ExprAdditive pars=(exprMultiplicative: ExprMultiplicative, exprAdditive_ : ExprAdditive_ ) rebuild=(XFORM.F(exprMultiplicative, exprAdditive_))>
+@exprMultiplicative@ @exprAdditive_@
+</code>
+
+<***********************************Arithmatic**********************************>
+
+<code RationalityOperator pars=(content : ">=" | "<=" | "<" | ">" ) rebuild=(content)>
+@content@
+</code>
+
+
+<code RationalityExpr1 pars=(exprAdditive1 : ExprAdditive, rationalityOperator : RationalityOperator, exprAdditive2 : ExprAdditive)>
+@exprAdditive1@ @rationalityOperator@ @exprAdditive2@
+</code>
+
+<code RationalityExpr pars=(content : RationalityExpr1 | ExprAdditive) rebuild=(content)>
+@content@
+</code>
+
+<code EqualityOperator pars=(content : "==" | "!="  ) rebuild=(content)>
+@content@
+</code>
+
+<code EqualityExpr1 pars=(rationalityExpr1 : RationalityExpr, equalityOperator : EqualityOperator, rationalityExpr2 : RationalityExpr)>
+@rationalityExpr1@ @equalityOperator@ @rationalityExpr2@
+</code>
+
+<code EqualityExpr pars=(content : EqualityExpr1 | RationalityExpr) rebuild=(content)>
+@content@
+</code>
+
+<code LogicalAndExpr_1 pars=(equalityExpr : EqualityExpr, logicalAndExpr_ : LogicalAndExpr_)>
+&& @equalityExpr@ @logicalAndExpr_@
+</code>
+
+<code LogicalAndExpr_ pars=(content : LogicalAndExpr_1 | "") rebuild=(content)>
+@content@
+</code>
+
+<code LogicalAndExpr pars=(equalityExpr : EqualityExpr, logicalAndExpr_ : LogicalAndExpr_) rebuild=(XFORM.F(equalityExpr, logicalAndExpr_))>
+@equalityExpr@ @logicalAndExpr_@
+</code>
+
+<code LogicalOrExpr_1 pars=(logicalAndExpr : LogicalAndExpr, logicalOrExpr_ : LogicalOrExpr_)>
+|| @logicalAndExpr@ @logicalOrExpr_@
+</code>
+
+<code LogicalOrExpr_ pars=(content : LogicalOrExpr_1 | "") rebuild=(content)>
+@content@
+</code>
+
+<code LogicalORExpr pars=(logicalAndExpr : LogicalAndExpr, logicalOrExpr_ : LogicalOrExpr_) rebuild=(XFORM.F(logicalAndExpr, logicalOrExpr_))>
+@logicalAndExpr@ @logicalOrExpr_@
+</code>
+
+
+<code ConditionalExpr pars=(content : LogicalORExpr) rebuild=(content)>
+@content@
+</code>
+
+<code Expr pars=(content : AssignmentExpr | ConditionalExpr) rebuild=(content)>
+@content@
+</code>
+
+
+<********************Expr**********************************>
+
+<code Type pars=(content : "int" | "float") rebuild=(content)>
+@content@
+</code>
+
+<code AssignmentExpr pars=(arrayId : ArrayId, expr : Expr)>
+@arrayId@ = @expr@
+</code>
+
+<code DeclaratorIdListUninitializedItem pars=(arrayId : ArrayId, declaratorIdList : DeclaratorIdList )>
+@arrayId@ , @declaratorIdList@
+</code>
+
+<code DeclaratorIdListInitializedItem pars=(assignmentExpr : AssignmentExpr, declaratorIdList : DeclaratorIdList)>
+@assignmentExpr@ , @declaratorIdList@
+</code>
+
+<code DeclaratorIdList pars=(content : DeclaratorIdListUninitializedItem | DeclaratorIdListInitializedItem | AssignmentExpr | ArrayId) rebuild=(content)>
+@content@
+</code>
+
+<code Declarator pars=(type : Type, declaratorIdList : DeclaratorIdList)>
+@type@ @declaratorIdList@
+</code>
+
+
+<********************Declarator**********************************>
+
+
+<code WhileStmt pars=(expr : Expr, stmt : Stmt)>
+while ( @expr@ ) @stmt@
+</code>
+
+<code IfStmtWithoutElse pars=(expr : Expr, stmt : Stmt)>
+if ( @expr@ ) @stmt@
+</code>
+
+<code IfStmtWithElse pars=(expr : Expr, stmtIf : Stmt, stmtElse : Stmt)>
+if ( @expr@ ) @stmtIf@ else @stmtElse@
+</code>
+
+<code IfStmt pars=(content : IfStmtWithElse | IfStmtWithoutElse) rebuild=(content)>
+@content@
+</code>
+
+<code BlockedStmts pars=(stmts : Stmts)>
+ { @stmts@ }
+</code>
+
+<code DeclaratorStmt pars=(declarator : Declarator)>
+@declarator@ ;
+</code>
+
+<code ExprStmt pars=(expr : CODE.Expr)>
+@expr@;
+</code>
+
+
+<code NullStmt>
+;
+</code>
+
+<code Stmt pars=(content : NullStmt | ExprStmt | DeclaratorStmt | BlockedStmts | IfStmt | WhileStmt ) rebuild=(content)>
+@content@
+</code>
+
+
+<code Stmts parse=LIST(Stmt, "\n") />
+
+<code Start pars=(content : CODE.Stmts) rebuild=(content)>
+@content@
+</code>
+
+<define PARSE Start />
+

@@ -1,0 +1,6 @@
+<parameter inputFile default="a.cpp" message="input file name: "/>
+<parameter outputFile default="out.txt" message="output file name: "/>
+
+<input from=inputFile annot=0 to=inputCode/>
+<output to=outputFile from=inputCode/>
+

@@ -1,0 +1,166 @@
+include opt.pi
+
+<parameter orig type=0|1 default=0 message="output original code" /> 
+<parameter inputFile default="" message="input file name" /> 
+<parameter pre type="s"|"d" default="d" message="Whether to compute at single- or double- precision" /> 
+<parameter alpha type=0|1 default=0 message="Whether the value of alpha is non-zero for the computation of alpha*A*B" /> 
+
+<parameter NB type=1.._ default=62 message="Blocking size of the matrices" /> 
+<parameter MB type=1.._ default=72 message="Blocking size of the matrices" /> 
+<parameter KB type=1.._ default=72 message="Blocking size of the matrices" /> 
+<parameter cpA type=0|1 default=1 message="whether to copy matrice A" /> 
+<parameter cpB type=0|1 default=1 message="whether to copy matrice B" /> 
+<parameter rdC type=0|1 default=1 message="whether to reduce matrice C" /> 
+<parameter kernel type=0|1 default=1 message="whether to perform kernel optimizations" /> 
+<parameter cleanup type=0|1 default=0 message="whether to generate cleanup code for loop blocking"/>
+
+<trace gemm,gemmDecl,gemmBody,nest3,nest2,nest1/>
+<trace ftype/>
+<trace tile/>
+<trace tileSplits/>
+<trace gemmIncl/>
+<trace codegen_gemm_kernel/>
+
+<input to=gemm syntax="Cfront.code" >
+void dgemm_test(const int M, const int N, const int K, 
+          const double alpha, const double *A, const int lda, 
+          const double *B, const int ldb, const double beta, 
+          double *C, const int ldc) 			
+{ 								
+
+   int i,j,l;     						//@=>gemmDecl=Stmt
+   for (j = 0; j < N; j += 1) 					//@ BEGIN(nest3=Nest)
+   { 	                                  		
+      for (i = 0; i < M; i += 1)  				//@ BEGIN(nest2=Nest) 
+      { 							
+         C[j*ldc+i] = beta * C[j*ldc+i]; 			 
+         for (l = 0; l < K; l +=1) 				//@ BEGIN(nest1=Nest)
+         { 							
+            C[j*ldc+i] += alpha * A[l*lda+i]*B[j*ldb+l];
+         }      						
+     }      							
+   } 								
+}  								
+</input>
+
+<eval gemmBody=nest3;tile="";tileSplits="";gemmIncl="";/>
+<output to="dgemm.c" cond=(orig) syntax="Cfront.code" from=gemm/>
+<eval ftype=((pre=="d")?"double" : "float");
+     stmtPattern=DELAY {ExpStmt#(Assign#(ArrayAccess#(C, J*LDC+I), 
+                                     ArrayAccess#(C,J*LDC+I) + "alpha" * ArrayAccess#(A,L*LDA+I) * ArrayAccess#(B,J*LDB+L)))};
+/>
+
+<eval
+   INSERT (gemm,gemm);
+   REPLACE(gemm, (gemmIncl::gemm), gemm);
+
+   if (! (nest3[Nest.ctrl] : Loop#(J,0,N,1)))
+      ERROR("unrecognized loop: " nest3[Nest.ctrl]);
+   if (! (nest2[Nest.ctrl] : Loop#(I,0,M,1)))
+      ERROR("unrecognized loop: " nest2[Nest.ctrl]);
+   if (! (nest1[Nest.ctrl] : Loop#(L,0,K,1)))
+      ERROR("unrecognized loop: " nest1[Nest.ctrl]);
+   if (! (nest1[Nest.body] : stmtPattern))
+      ERROR("unrecognized stmt: " nest1[Nest.body]);
+ 
+   I_bk = I^"_bk"; J_bk = J^"_bk"; L_bk = L^"_bk";
+   Iblock=BlockDim#(I, I_bk, MB);
+   Jblock=BlockDim#(J, J_bk, NB);
+   Lblock=BlockDim#(L, L_bk, KB);
+   AppendDecl(IntegerType, (I_bk J_bk L_bk), gemmDecl);
+   BlockLoops[trace=gemm; factor=(Jblock Iblock Lblock);
+              trace_innerNest=tile; trace_splits=tileSplits;
+              trace_decl=gemmDecl; nonPerfect=nest1]
+        (nest1[Nest.body], nest3);
+
+   <* apply array copy and strength-reduction to blocked matrices A *>
+   if (cpA)
+   {
+      A_1="i_"^A^"_cp_1"; A_0="i_"^A^"_cp_0"; 
+      A_bk_1 = "i_"^A^"_cp_bk_1"; A_bk_0="i_"^A^"_cp_bk_0";
+      AppendDecl(IntegerType, (A_1 A_0 A_bk_1 A_bk_0), gemmDecl);
+      A_cp=A^"_cp";
+
+      CopyRepl[elem_type=ftype; init_loc=nest3; trace_decl=gemmDecl; 
+         trace=gemmBody; usePtr=1; 
+         cpBlock=(CopyBlock#(A_bk_1,I_bk,Iblock) CopyBlock#(A_bk_0,L_bk,Lblock));
+         permute=(2,1); delete_loc=nest3] 
+       (A_cp,"alpha"*ArrayAccess#(A,A_0*LDA+A_1), 
+            ( CopyArrayDim#(A_1,0,M,1) CopyArrayDim#(A_0,0,K,LDA) ), nest3);
+      Arepl="";
+      TRACE( Arepl, 
+            FiniteDiff[exp_type=(PtrType#ftype); trace_decl=gemmDecl; 
+                    trace_newVars=Arepl; scalar=0; trace=gemmBody]
+             (A_cp, A_cp, (ExpDim#(nest2,1,A_bk_0) ExpDim#(nest1,1,MB)), nest2)); 
+   }
+
+   <* apply array copy and strength-reduction to blocked matrices B *>
+   if (cpB)
+   {
+    B_1="i_"^B^"_cp_1"; B_0="i_"^B^"_cp_0"; 
+    B_bk_1 = "i_"^B^"_cp_bk_1"; B_bk_0="i_"^B^"_cp_bk_0";
+    AppendDecl(IntegerType, (B_1 B_0 B_bk_1 B_bk_0), gemmDecl);
+    B_cp = B^"_cp";
+    CopyRepl[elem_type=ftype; init_loc=nest3; trace_decl=gemmDecl; 
+         trace=gemmBody; usePtr=1; 
+         cpBlock=(CopyBlock#(B_bk_1,J_bk,Jblock) CopyBlock#(B_bk_0,L_bk,Lblock)); delete_loc=nest3] 
+        (B_cp, ArrayAccess#(B,B_1 * LDB + B_0), 
+             (CopyArrayDim#(B_1,0,N,LDB) CopyArrayDim#(B_0,0,K,1)), nest3);
+    Brepl="";
+    TRACE(Brepl, 
+            FiniteDiff[exp_type=(PtrType#ftype); trace_decl=gemmDecl; 
+                      trace_newVars=Brepl; scalar=0; trace=gemmBody]
+            (B_cp, B_cp, (ExpDim#(nest3,1,B_bk_0) ExpDim#(nest1,1,NB)), nest3)); 
+   }
+
+   <* strength-reduce the starting addr. of matrix C *>
+   if (rdC) {
+     Crepl="";
+     TRACE(Crepl,
+      FiniteDiff[exp_type=(PtrType#ftype); scalar=0;
+              trace_decl=gemmDecl; trace_newVars=Crepl; trace=gemmBody]
+       ("C", "C", (ExpDim#(nest3,1,LDC) ExpDim#(nest2,1,1)), nest3)); 
+     Crepl2=HEAD(TAIL(Crepl));
+   }
+
+  REBUILD(gemm);
+/>
+
+<eval 
+  if (kernel) {
+   ftype=(pre=="d")?"double" : "float";
+  }
+/>
+
+<input cond=kernel parse=POET to=POET from="gemmKernel.pt"/>
+
+<eval 
+  if (kernel) {
+      <* Interface to kernel opt include the following variables:
+          ftype, gemm, gemmIncl, gemmBody, nest3, nest2,nest1 *>
+    alpha = 0;
+    collect = ERASE(tile,tile)::ERASE(tileSplits,tileSplits);
+    kernel_i=0;
+    for (p_col = collect; p_col != ""; (kernel_i+=1;p_col = cdr(p_col))) {
+       cur = car p_col;
+       if (cur == "") CONTINUE;
+       if (cur : BlockSplit) {
+           cur = cur[BlockSplit.split];
+       }
+       ERASE( (gemmBody nest3 nest2 nest1), gemm);
+       cur = ERASE(cur,cur);
+       TraceNest[nonPerfect=nest1](cur, (nest3 nest2 nest1));
+       gemmBody = cur;
+       INSERT(gemmBody, gemm);
+       if (kernel_i > 0) ERASE((gemmDecl gemmIncl), gemm);
+       APPLY {codegen_gemm_kernel};
+    }
+  }
+/>
+
+<eval if (cleanup) {
+          CleanupBlockedNests[only=CODE.BlockLoopTileEnd;trace=gemm](gemm); 
+      }
+/>
+
+<output to="dgemm.c" cond=(!orig) syntax="Cfront.code" from=gemm/>

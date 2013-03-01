@@ -1,0 +1,422 @@
+include Loops.incl
+include omp.incl
+
+<*
+   POET : Parameterized Optimizations for Empirical Tuning
+   Copyright (c)  2008,  Qing Yi.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ 1. Redistributions of source code must retain the above copyright notice,
+    this list of conditions and the following disclaimer.
+ 2. Redistributions in binary form must reproduce the above copyright notice,
+    this list of conditions and the following disclaimer in the documentation
+    and/or other materials provided with the distribution.
+ 3. Neither the name of UTSA nor the names of its contributors may be used to
+    endorse or promote products derived from this software without specific
+    prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
+OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
+OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISEDOF THE POSSIBILITY OF SUCH DAMAGE.
+*>
+
+<******************************************************************
+  code template interfaces for building non-loop nests 
+*****************************************************************>
+<code If pars=(condition) />
+<code Else ifNest=INHERIT/>
+<******************************************************************
+  code template interfaces for assembly-level optimization, e.g., 
+    SSE vectorization, prefetching, alignment 
+*****************************************************************>
+<code AddrOf pars=(var)/>
+<code VALUE pars=(ptr)/>
+<code VarDeclStmt pars=(type, var) />
+<code ExpStmt pars=(exp)/>
+<code PostIncrement pars=(ivar)/>
+<code AllocateStore pars=(ptr, type,size)/>
+<code DeleteStore pars=(ptr,size)/>
+<code PtrType pars=(base)/>
+<code IntegerType />
+<code Assign pars=(lhs,rhs)/>
+<code IfStmt pars=(condition,body)/>
+<code VecZero pars=(reg)/>
+<code VecRegMov pars=(reg1,reg2)/>
+<code VecReg2ArrU pars=(reg,vec)/>
+<code Arr2VecRegU pars=(vec,reg)/>
+<code Var2VecReg pars=(ptr,reg)/>
+<code Var2VecRegL pars=(ptr,reg)/>
+<code VecReg2Var pars=(reg,ptr)/>
+<code VecRegRed2Arr4 pars=(reg1, reg2, reg3, reg4, wkreg1, wkreg2,ptr)/>
+<code VecRegRed2Arr2 pars=(reg1, reg2, wkreg, ptr)/>
+<code VecRegRed2Var pars=(reg,ptr, wkreg)/>
+<code VecReg2Arr pars=(reg,ptr)/>
+<code Arr2VecReg pars=(ptr,reg)/>
+<code VecRegMul pars=(reg1,reg2)/>
+<code VecRegAdd pars=(reg1,reg2)/>
+<code VecRegMinus pars=(reg1,reg2)/>
+<code SSEincl pars=(pre)/>
+
+<* blocking dimension specification*>
+<code BlockDim pars=(ivar, bvar, blocksize)  />
+
+<* specification of non-perfect loops in BlockLoops*>
+<code NonPerfectLoops pars=(pivot,loops)/>
+
+<code BlockSplit pars=(orig, split)/>
+<code BlockCleanup pars=(orig, cleanup)/>
+
+<code StmtsInLoops pars=(loops, stmts) />
+
+
+<* prefetching *>
+<code AddrPrefetch pars=(addr)/>
+<code InclPrefetch />
+<code InclOmp />
+<code InclPapi />
+<code InclStdio />
+<code ExternalPAPIDecl />
+
+<* alignment *>
+<code AddrAlign pars=(addr, elemsize)/>
+
+<* Marker for the stopping end of a inner tiled loop *> 
+<code BlockLoopTileEnd pars=(bloop, no_mod : INT)/>
+
+<* OpenMP*>
+<code OMP_MACRO/>
+<code OMPParallelLoop/>
+<code OMPParallelBlock /> 
+<code OMPAttrList/>
+<code OMPSetNumThreads />
+<code OMPPrivateNameList/>
+<code OMPReductionNameList/>
+
+<************************************************************
+  interface of parameterized loop optimization routines
+************************************************************>
+
+<***********************************************************************
+ convert each array reference in $input$ to a pointer reference 
+********************************************************************>
+<xform ArrayAccess2PtrRef trace="" pars=(input) />
+
+<***********************************************************************
+ break the code fragment $input$ at break points in $splitlist$ 
+********************************************************************>
+<xform DistributeLoops pars=(splitlist, input) trace_split="" trace=""/>
+
+<***********************************************************************
+ fuse multiple loop nests into a single one. The new nest will replace $pivot$
+   in the original $input$ 
+********************************************************************>
+<xform FuseLoops pars=(nestsToFuse, pivot, input) trace=""/>
+
+<**********************************************************************
+ Block the loops nested within $input$ and outside of $inner$.
+ factor: a list of blocking sizes for the loops; 
+ cleanup (1/0/-1): cleanup=1: split blocked loops using cleanup code;
+                   cleanup=-1 => split blocked loops; but ignore cleanup code;
+                   cleanup=0 =>  don't split blocked loops; no cleanup;
+ unroll (1/0): whether unroll the blocked loops ;
+ bounds_dependence: a list of inter-dependencies among bounds of nested loops;
+        e.g.: (0 1) means that $input$ is a nest with two loops, 
+              and the bounds of the inner loop can be determined by substituting
+              the bounds of the outer loop induciton variable. 
+              (0 -1) means that the bounds of the inner loop should
+              substitute the inverse of the outer loop induction variable.
+ nonPerfect (0/1): whether to handle non-prefectly nested loops via iteration spliting.
+ outerNests, innerNests: tracing handles for the tiled outer/inner loop nests;
+ trace_decl: tracing handle for variable declarations;
+ trace_mod: trace the modification of expressions inside loop body
+ trace: the tracing handle surrounding $input$; 
+**************************************************************************>
+<xform BlockLoops pars=(inner,input) 
+     factor="" cleanup=0 unroll=0 bounds_dependence=0 nonPerfect="" 
+     trace_mod=""
+     trace_outerNest="" trace_innerNest="" trace_splits="" trace_cleanup=""
+     trace_decl="" trace="" />
+
+<*******************************************************************
+ Unroll the outermost loops outside of $inner$ within $input$. 
+ factor: unroll factor; 
+ trace: the tracing handle surrounding $input$; 
+*********************************************************************>
+<xform UnrollLoops pars=(inner,input) factor=8  cleanup=0 trace_unrollNest="" trace=""/>
+
+<*******************************************************************
+Permute the loops nested within $input$ and outside of $inner$.
+  order: index for ordering the loops. 
+         e.g., (2 3 1) means reordering a loop nest (I,J,K) into (K,I,J)*>
+<xform PermuteLoops pars=(inner,input) order=0 />
+
+<*******************************************************************
+ Unroll the outermost loops within $input$ and outside of $jnest$, then
+ jam all the unrolled code inside $jnest$.
+ factor: unroll factor;
+ trace: the tracing handle surrounding $input$; *>
+<xform UnrollJam pars=(jnest,input) factor=4 cleanup=0 trace="" />
+
+<*******************************************************************
+ Copy the memory referenced by $aref$ into a new buffer and replace
+  the relevant references in $input$.
+  buf: the name to use for the buffer; 
+  dim: a list of array dimensions to be copied/replaced. 
+     Each dimension is a CopyArrayDim code template object (see below).
+  scalar 0/1: whether to do scalar replacement or to use an array as buffer ; 
+  usePtr 0/1: whether to use pointer reference in copying to the buffer;
+  cpBlock: a list of CopyBlock objects that define relevant loop blocking info;
+           if empty, no blocking.
+  elem_type:  the type of elements stored in array;
+         leave empty if no new buffer array should be declared (created).
+  init_loc/save_loc: locations for initializing the buffer and for copying
+               back buffered values respectively;
+  delete_loc: if not empty, allocate array from the heap
+       (applies when scalar=0; array is declared pointer type + allocate + delete). 
+        delete the ptr at the end of delete_loc
+  prefix:  the string to add before the names of the generated variables. 
+  permute: permutation of dimensions so that they are sorted in decreasing size;
+
+  trace_decl: tracing handle for variable declarations;
+  trace_mod: tracing handles that need to be modified accordingly after the transformation
+  trace: the tracing handle surrounding $input$; 
+*********************************************************************>
+<****bvar_copy: block-copy induction variable ****>
+<****bvar_loop: the induction variable of the blocking loop****>
+<*** bsize: blocking factor to partition the array dimension***>
+<code CopyBlock pars=(bvar_copy, bvar_loop, bsize)/>
+
+<* QY:
+  Defines a dimension of array.  
+  e.g., CopyArrayDim("i","i",5,"lda") defines a dimension 
+       represented by induction variable "i",includes 5 elements with subscripts
+       starting from "i" (includes i,i+1,i+2,i+3,i+4), and each element is "lda"
+       distance apart in memory.*>
+<code CopyArrayDim pars=(ivar, start, size, distance) />
+
+<xform CopyRepl pars=( buf, aref, dim, input) 
+         prefix="" elem_type="" init_loc="" save_loc="" delete_loc="" dimlist=0
+         scalar=0 cpBlock="" permute="" usePtr=0 cpCleanup=0
+         trace_decl="" trace_mod="" trace_vars="" trace=""/>
+
+<*******************************************************************
+ replace the memory referenced through $aref$ with
+  scalar variables (all scalar variables will be named by attaching an
+  integer index to "buf"). 
+  Is just a wrapper of CopyRepl[scalar=1]; See CopyRepl for more details 
+*********************************************************************>
+<xform ScalarRepl pars=( buf, aref, dim, input)  
+      prefix="" elem_type="" init_loc="" save_loc=""  dimlist=0
+      trace_decl="" trace_repl="" trace="" />
+ 
+<********************************************************************
+Transform input statement into multiple three address code statements
+*********************************************************************>
+<xform TransformThreeAddress pars=(input) counter=0 nvars="" trace=""/>
+
+<********************************************************************
+Transform input statement into multiple two address code statements
+pre-condition: input must be a three address code statement
+*********************************************************************>
+<xform TransformTwoAddress pars=(input) trace=""/>
+
+<*******************************************************************
+ use auxiliary induction variables to build up and substitute expressions in $input$;
+   if replInput != "", then all occurrences of $exp$ in $replInput$
+   are replaced with the new variable now holds the value of $exp$.
+
+   pv: the name to use for the auxiliary induction variables created;
+   base: the loop-invarient expression base 
+   dim: a list of finite difference dimensions.
+     e.g., if exp = pA + (i * lda + k), where $i$ and $k$ are the induction
+        variables of two loop nests $nest_i$ and $nest_k$ surrounding $exp$,
+        then there are two dimensions: ExpDim#(nest_i,1,lda) and
+        ExpDim#(nest_k,1,1)
+   input: the input code (that has the loop nests) to transform (insert/add new code) 
+
+  exp_type: the value type of $exp$;
+  patterns: a list of additional expression that can be used as patterns
+          to match expressions that need to be optimized;
+  scalar: whether to do scalar expression or array references
+  addi_vars: a list of additional variables used as place holders for any
+         additional subexpression that appears in $exp$;
+  trace_decl: tracing handle for new variable declarations;     
+  trace_newVars: tracing handle for the new auxiliary induction variables created;
+  trace: tracing handle for transformations
+*********************************************************************>
+<*QY: nest: the loop used to incrementally build the expression;
+   count: an integer indicating the number of auxilariy induction 
+             variables to create for loop;
+  dist: an expression indicating the induction distance (step) of the loop.
+*>
+<code ExpDim pars=(nest:Nest, count:INT, dist:EXP)/>
+
+<* QY: apply trength reduction (finite differencing) to expressions in the form
+       of  base+dim contained in input. use "pv" as hint for aux. ivar names.
+  permute: permutation of dimensions so that they are sorted in decreasing size;
+*>
+<xform FiniteDiff pars=(pv,base,dim, input) 
+            exp_type="" addi_vars=""  scalar=1 permute=""
+         trace_decl="" trace_newVars="" trace_mod="" trace="" />
+
+<*******************************************************************
+ Apply SSE Vectorization to the loop nest $vnest$ within $input$.
+   vars: vector register assignment, which contains
+         a list of (vars, dist) pairs, where $vars$ is a list of one or more
+         varaible names to be assigned to vector registers, and $dist$ is the
+         distance of the corresponding values in the original array ---if the
+         values are not from an array, then the distance is 0. 
+         The (vars,dist) pars can also be grouped to share a single vector register.
+      e.g. if vars = (( ("beta", 0) (("A1" "A2" A3"),1)), "s"),
+         then "beta" is a stand-alone scalar variable, "A1","A2","A3" are three
+         scalar variables that hold consecutive values from an array, and
+         "beta" can share a vector register allocated to ("A1" "A2" A3").
+   alignOpt: whether $vnest$ should be pre-aligned for vectorization;
+   elem_prec: the precision of floating point values. (=d: double; =f: single);
+   iRegno: number of vector registers available;
+   iReglen: size of each vector register;
+   init_vars/save_vars: which variables need to be initialized/copied back between
+                the memory and the assigned vector registers;
+   reduce_vars: which variables need to have their value reduced after vectorization;
+   aligned_arrays: which arrays are pre-aligned in memory;
+   trace_decl: tracing handle of variable declarations;
+   trace_include: tracing handle for additional include files;
+   trace: tracing handle for the code surrounding $input$; 
+*********************************************************************>
+<xform VectorizeCode pars=(vars, vnest,input) alignOpt=""
+        iRegno=16 iReglen=16  elem_prec="d"
+        init_vars=""  save_vars="" reduce_vars="" aligned_arrays="" 
+        trace_decl=""  trace_include="" trace="" />
+
+<*******************************************************************
+Insert prefetching operations for memory starting at $addr$ within $input$.
+   var: the name of the induction variable used to track address to prefetch;
+   nests: a list of locations to insert prefetching operations. 
+          Each location in the list is a pair (init, induction), where $init$
+          specifies where to initialize a induction variable for prefetching,
+          and $induction$ specifies where to insert the prefetching operation
+          and to increment the induction variable; 
+   dist: a list of distances to increment the prefetching induction variable at each location;
+   elem_type: the type of elements in the array being prefetched;
+   trace_include: tracing handle for additional include files;
+   trace_decl: tracing handle for variable declarations;  
+*********************************************************************> 
+<xform Prefetch pars=(addr, nests, dist, input) elem_type="" 
+                trace_include=""  trace_decl="" trace="" var="" />
+
+<*******************************************************************
+Clean up the min/max operations created in loop blocking by splitting 
+the blocked loops.
+*********************************************************************>
+<xform CleanupBlockedNests pars=(input) only="" trace_cleanup="" trace=""/>
+
+<*******************************************************************************
+  Profiling (implemented using PAPI)
+*******************************************************************************>
+
+<* FIXME (3/8/2010): \a input must be immediately after \c program *>
+<xform InitProfile pars=(input) omp=0 trace="" />
+<xform FinalizeProfile pars=(input) omp=0 trace="" />
+<xform SkewLoops pars=(outer,inner,input) factor=""  nonPerfect=""  trace="" />
+       
+
+<*******************************************************************
+  Parallelize a loop nest
+*********************************************************************>
+
+<**
+ *  \brief  Parallelize loop.
+ *  \param  input  LoopNest
+ *  \param  shared  NameList
+ *  \param  private  NameList
+ *  \param  reducion  NameList
+ *  \param  reducion_op  EXP_BOP
+ *  \param  schedule  "static"|"dynamic"|"guided"
+ *  \param  schedule_chunk   INT  schedule chunck size; 0 means auto
+ *  \param  threads  INT  number of threads to use; 0 means max threads
+ *  \param  trace_include  TRACE
+ *  \param  trace_decl  TRACE
+ *  \param  trace  TRACE
+ *  \return  \a input decorated with paralel instructions.
+ *>
+<xform ParallelizeLoop pars=(input)
+                       shared="" private="" reduction="" reduction_op=""
+                       schedule="" schedule_chunk=0 threads=0
+                       trace_include="" trace_decl="" trace="" />
+
+<*******************************************************************
+**QY: The following functions are not part of the interface**
+********************************************************************>
+
+<*******************************************************************
+ Split all operations on variables in $vars$ into separate statements
+   in $input$.
+   iReuse: whether the variables $vars$ should be reused in storing the 
+           results of broken statements;
+   var_type:  the value type of variables in $vars$;
+   trace_newVars: tracing handle for new variables;
+   trace_decl: tracing handle for variable declarations; 
+<xform SplitStmt pars=(vars,input) iReuse=1 var_type=""
+                 trace_newVars="" trace_decl="" trace="" new=""/> 
+********************************************************************>
+
+<**********************************************************************
+ peel the first $numOfItersToPeel$ of iterations off the input $loopNestToPeel$ 
+<xform PeelLoop pars=(numOfItersToPeel, loopNestToPeel) 
+                peel_at_end=0 precise_split=1 trace="" trace_peel=""/>
+
+*********************************************************************> 
+
+<***********************************************************************
+ embed stmts that are at the same level of $nest$ to be within $nest$ 
+<xform EmbedStmts pars=(nest,input) trace=0/>
+********************************************************************>
+
+<*******************************************************************
+Replace the memory referenced by $exp$ with references from a new $buf$
+in $input$.
+Parameter values: see CopyRepl.
+<xform ReplExp pars=(buf, exp, sub, dim, input) 
+               prefix="" scalar=0 block="" permute="" addi_vars="" trace="" />
+*********************************************************************>
+
+<*******************************************************************
+ replace the memory referenced through $oldval$ with a new value $nval$ 
+   within $input$, where the $sub$ and $dim$ defines the size of 
+   array-referenced values to be replaced (see CopyRepl for more details).
+<xform ValueRepl pars=(nval, oldval, sub, dim, input) /> 
+*********************************************************************>
+
+<*******************************************************************
+ Scale the induction variable of $nest$ by factor $time$. 
+  e.g., if $nest$ is "for (i = 2; i < 20; i+=2) { a[i] = b[i]; }", 
+     then ScaleLoop(2,nest) => "for (i=1;i<10;i+=1) { a[2*i] = b[2*i]; }" 
+<xform ScaleLoop pars=(time, nest)/>
+*********************************************************************>
+
+<*******************************************************************
+ Shift the induction variable of $nest$ by $offset$.
+  e.g., if $nest$ is "for (i = 2; i < 20; i+=2) { a[i] = b[i]; }", 
+        then ShiftLoop(2,nest) => "for (i=0;i<18;i+=2) { a[i+2]=b[i+2]; } 
+<xform ShiftLoop pars=(offset, nest)/>
+*********************************************************************>
+
+<*******************************************************************
+Lower level routines that are directly mapped to OpenMP instructions. 
+<xform DoParallel pars=(input) private="" shared="" trace="" thread=0/>
+<xform InitParallel pars=(input) decl="" trace="" />
+<xform SetNumThreads pars=(input) num=1 trace="" />
+<xform SetNested pars=(input) num=1 trace="" />
+<xform SetSchedule pars=(input) schedule=0 chunk=0  trace="" />
+*********************************************************************>
+
+
+<** EOF **>

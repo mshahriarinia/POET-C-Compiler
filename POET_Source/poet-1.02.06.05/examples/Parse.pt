@@ -1,0 +1,56 @@
+include utils.incl
+
+<parameter inputFile message="input file name"/>
+<parameter outputFile  message="output file name"/>
+
+<code Goal/>
+
+<input from=(inputFile) syntax="BNFexp.code" parse=Goal to=inputCode/>
+
+<eval PRINT(inputCode)/>
+
+<code IntType/>
+<code FloatType />
+<code ArrayType pars=(elemType, arraySize) />
+<code Bop pars=(op, opd1,opd2) />
+
+<eval table = MAP(STRING,IntType|FloatType|ArrayType);/>
+<* insert a variable x of integer type into symbol table *>
+<eval 
+   foreach ( ("a","b","c") : (x=STRING) : TRUE) {
+     if (table[x] != "")
+        ERROR( "variable multiply declared: " x);
+     else table[x] = IntType;
+   }
+/>
+<* print out the symbol table *>
+<eval PRINT(table["a"]); />
+      
+<xform LookupVariable pars=(symTableList, varName)>
+if (symTableList == "") 
+    ERROR("Variable not found: " varName);
+curTable = HEAD(symTableList);
+res = curTable[varName];
+if (res != "") RETURN res;
+LookupVariable(TAIL(symTableList), varName)
+</xform>
+
+<xform TypeCheckExp pars=(symTable, exp)>
+  switch(exp)
+  {
+    case Bop#("+"|"-"|"*"|"/"|"%", exp1, exp2):
+          type1 = TypeCheckExp(symTable, exp1);
+          type2 = TypeCheckExp(symTable, exp2);
+          if  (type1 : IntType && type2 : IntType)  returnType=IntType;
+          else if (type1 : FloatType && type2 : FloatType) returnType=FloatType;
+          else ERROR("Type checking error: " exp);
+          symTable[exp] = returnType;   <<* saving the type of exp in symbol table
+          returnType
+     case STRING:  PRINT(symTable[exp]); (symTable[exp])
+     case INT : IntType
+  }
+</xform>
+
+<eval TypeCheckExp(table, inputCode);/>
+
+<output to=outputFile from=table/>

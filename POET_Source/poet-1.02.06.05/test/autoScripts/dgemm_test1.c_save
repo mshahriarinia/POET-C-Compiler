@@ -1,0 +1,133 @@
+
+void dgemm_test(const int M,const int N,const int K,const double alpha,const double* A,const int lda,const double* B,const int ldb,const double beta,double* C,const int ldc) 
+{
+   int i;
+   int j;
+   int l;
+   int j_par;
+   int l_bk;
+   int i_bk;
+   int j_bk;
+   for (j_bk=0; j_bk<-15+N; j_bk+=16) 
+     {
+        for (i_bk=0; i_bk<-15+M; i_bk+=16) 
+          {
+             if (15<K)  
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<16; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             if (K<16)  
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<K; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             for (l_bk=16; l_bk<-15+K; l_bk+=16) 
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   for (l=0; l<16; l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+             if (l_bk<K)  
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   for (l=0; l<(K+-l_bk); l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+          }
+        if (i_bk<M)  
+          {
+             if (15<K)  
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<16; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             if (K<16)  
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<K; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             for (l_bk=16; l_bk<-15+K; l_bk+=16) 
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   for (l=0; l<16; l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+             if (l_bk<K)  
+               for (j=0; j<16; j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   for (l=0; l<(K+-l_bk); l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+          }
+     }
+   if (j_bk<N)  
+     {
+        for (i_bk=0; i_bk<-15+M; i_bk+=16) 
+          {
+             if (15<K)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<16; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             if (K<16)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<K; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             for (l_bk=16; l_bk<-15+K; l_bk+=16) 
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   for (l=0; l<16; l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+             if (l_bk<K)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<16; i+=1) 
+                   for (l=0; l<(K+-l_bk); l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+          }
+        if (i_bk<M)  
+          {
+             if (15<K)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<16; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             if (K<16)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      C[i+(i_bk+(j_bk*ldc+j*ldc))] = beta*C[i+(i_bk+(j_bk*ldc+j*ldc))];
+                      for (l=0; l<K; l+=1) 
+                        C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(i_bk+i)]*B[l+(j_bk*ldb+j*ldb)];
+                   }
+             for (l_bk=16; l_bk<-15+K; l_bk+=16) 
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   for (l=0; l<16; l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+             if (l_bk<K)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   for (l=0; l<(K+-l_bk); l+=1) 
+                     C[i+(i_bk+(j_bk*ldc+j*ldc))] = C[i+(i_bk+(j_bk*ldc+j*ldc))]+alpha*A[l*lda+(l_bk*lda+(i_bk+i))]*B[l+(l_bk+(j_bk*ldb+j*ldb))];
+          }
+     }
+}

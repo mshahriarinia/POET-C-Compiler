@@ -1,0 +1,5 @@
+<parameter inputFile default="" message="input file name" />
+<parameter outputFile default="" message="output file name" />
+
+<input from=inputFile syntax="Cfront.code" to=inputCode/>
+<output to=outputFile syntax="C2F.code" from=inputCode/>

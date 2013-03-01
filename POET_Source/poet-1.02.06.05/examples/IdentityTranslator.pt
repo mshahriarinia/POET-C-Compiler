@@ -1,0 +1,5 @@
+<parameter inputFile default="" message="input file name" />
+<parameter outputFile default="" message="output file name" />
+
+<input from=inputFile annot=0 to=inputCode/>
+<output to=outputFile from=inputCode/>

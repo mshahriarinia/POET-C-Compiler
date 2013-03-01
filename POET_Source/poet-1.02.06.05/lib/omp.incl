@@ -1,0 +1,143 @@
+<** \file omp.incl
+ *  OpenMP langudage-independant description.
+ *  Since 4/30/2010
+ *  Redefine macros to port to specific host language, like C/Fortran.
+ *>
+
+<code OMPPragma pars=(content)/> <*need to be defined by the underlying language*>
+<define OMP_HEADERS ("<omp.h>") />
+
+<* OpenMP Macros *>
+
+<define OMP_PARALLEL CODE.OMPParallelSection
+                     CODE.OMPParallelLoop />
+
+<define OMP_SYNC CODE.OMPBarrier
+               | CODE.OMPCritical
+               | CODE.OMPAtomic />
+
+<define OMP_INST GLOBAL.OMP_PARALLEL | GLOBAL.OMP_SYNC />
+
+<**
+ *  OpenMP parallel attribute is implementation dependent.
+ *
+ *  - OMPVarDecl  standard, i.e. shared/private/reduction
+ *  - OMPSchedule  standard
+ *  - OMPNumThreads  non-standard, but avaiable in GNU/Intel/MS implementation.
+ *>
+<define OMP_ATTR CODE.OMPVarDeclList
+               | CODE.OMPSchedule
+               | CODE.OMPNumThreads />
+
+
+<code OMPSetNumThreads pars=(num:EXP)>
+omp_set_num_threads(@num@);
+</code>
+
+<code OMPAttrList parse=LIST(OMP_ATTR, " ") />
+
+<code OMPParallelSection pars=(attr:OMPAttrList|"")>
+parallel @attr@ 
+</code>
+
+<code OMPParallelLoop pars=(attr:OMPAttrList|"")>
+ for @attr@
+</code>
+
+<code OMPParallelBlock pars=(content)>
+ parallel  
+ {
+ @content@
+ }
+</code>
+
+
+<code OMPVarDeclList parse=LIST( CODE.PrivateNameList
+                               | CODE.SharedNameList
+                               | CODE.ReducionNameList
+                               , "" )/>
+
+<code OMPPrivateNameList pars=(vars:NameList)>
+private(@vars@)
+</code>
+
+<code OMPSharedNameList pars=(vars:NameList)>
+shared(@vars@)
+</code>
+
+<code OMPReductionNameList pars=(op:EXP_BOP, vars:NameList)>
+reduction(@op@:@vars@)
+</code>
+
+<code OMPSchedule pars=(policy:CODE.OMPSchedulePolicy, chunk:INT)>
+schedule(@policy@, @chunk@)
+</code>
+
+<code OMPSchedulePolicy pars=(content: CODE.OMPAutoPolicy
+                                     | CODE.OMPStaticPolicy
+                                     | CODE.OMPDynamicPolicy
+                                     | CODE.OMPGuidedPolicy)>
+@content@
+</code>
+
+<code OMPAutoPolicy>
+auto
+</code>
+
+<code OMPStaticPolicy>
+static
+</code>
+
+<code OMPDynamicPolicy>
+dynamic
+</code>
+
+<code OMPGuidedPolicy>
+guided
+</code>
+
+<code OMPNumThreads pars=(num:INT)>
+num_threads(@num@)
+</code>
+
+<code OMPBarrier>
+barrier
+</code>
+
+<code OMPCritical>
+critical
+</code>
+
+<code OMPAtomic>
+atomic
+</code>
+
+<* OpenMP Functions *>
+
+<code OMPThreadType>
+int
+</code>
+
+<code CallOMPThreadSelf>
+@ FunctionCall#("omp_thread_num", "") @
+</code>
+
+<define OMPCurrentThread CallOMPThreadSelf />
+
+<code CallOMPGetNumProcs>
+@ FunctionCall#("omp_get_num_procs", "") @
+</code>
+
+<code CallOMPGetNumThreads>
+@ FunctionCall#("omp_get_num_threads", "") @
+</code>
+
+<code CallOMPSetNumThreads pars=(threads:EXP)>
+@ FunctionCall#("omp_set_num_threads", threads) @
+</code>
+
+<code CallOMPSetMaxNumThreads>
+@ CallOMPSetNumThreads#(CallOMPGetNumThreads) @
+</code>
+
+<** EOF **>

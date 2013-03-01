@@ -1,0 +1,216 @@
+include opt.pi
+include Cfront.code
+
+<parameter inputFile=STRING[""] "input file name"/>
+
+<parameter pre="s"|"d"["d"] "Whether to compute at single- or double- precision"/>
+
+<parameter alpha=0..1[0] "Whether the value of alpha is non-zero for the computation of alpha*A*B"/>
+
+<parameter NB=1.._[62],MB=1.._[72],KB=1.._[72] "Blocking size of the matrices"/>
+
+<parameter SP=0..1[1] "Whether or not to specialize the kernel for the given matrix size"/>
+
+<parameter mu=1..MB[4],nu=1..NB[1] "Unroll and Jam factors for outer loops"/>
+
+<parameter ku=1..KB[KB] "Unroll factor for the innermost loop"/>
+
+<parameter SSELEN=8|16[8] "The length of SSE registers. Should be 8 for 32 bit machines and 16 for 64 bit machines"/>
+
+<parameter SSENO=0|8|16[8] "The number of SSE registers. Should be 8 for 32 bit Intel machines and 16 for 64 bit Intel machines"/>
+
+<parameter PF=0..4[1] "Whether or not to prefetch next block of A, B, C; PF=1: prefetch A only; PF=2: prefetch A and B; PF = 3: prefetch A and C; PF=4: prefetch A, B, C"/>
+
+<parameter threeAddress=0..1[1] "whether or not translate to three-address code"/>
+
+<parameter permuteReg=TUPLE(INT,INT,INT,INT)[(1,2,3,4)] "permutation of integers (1,2,3,4) to control the ordering of scalar repl (for A,B,C) and unrollJam (register level blocking); The original ordering is A_scalar->UnrollJam->B_scalar->C_scalar"/>
+
+<parameter permuteUnroll=TUPLE(INT,INT)[(1,2)] "permutation of integers (1,2) to control the ordering of FiniteDifferencing and loop unrolling. The original ordering is FiniteDiff -> Unroll"/>
+
+<define ftype  (pre=="d")?"double" : "float"/>
+
+<<*<if inputFile=="">
+<input to=gemm syntax="Cfront.code" type=FunctionDefn>
+void ATL_USERMM(const int M, const int N, const int K, 
+          const double alpha, const double *A, const int lda, 
+          const double *B, const int ldb, const double beta, 
+          double *C, const int ldc) 			
+{ 								
+   int i, j, l;     						//@=>gemmDecl:Stmt 
+   for (j = 0; j < N; j += 1) 					//@ =>loopJ:Loop BEGIN(gemmBody) BEGIN(nest3)
+   { 	                                  		
+      for (i = 0; i < M; i += 1)  				//@=>loopI:Loop BEGIN(nest2) 
+      { 							
+         C[j*ldc+i] = beta * C[j*ldc+i]; 			//@  =>_:Stmt 
+         for (l = 0; l < K; l +=1) 				//@=>loopL:Loop BEGIN(nest1)
+         { 							
+            C[j*ldc+i] += alpha * A[i*lda+l]*B[j*ldb+l];	//@ =>_:Stmt
+         }      						//@END(nest1:Nest) 
+     }      							//@END(nest2:Nest) 
+   } 								//@END(nest3:Nest) END(gemmBody:Nest) 
+}  								
+</input>
+
+<<*<input gemm cond=(inputFile != "") code="Cfront.code" "dgemm.c" : FunctionDefn/>
+
+<define lda  SP? KB : "lda"/>
+<define ldb  SP? KB : "ldb"/>
+<define cij Bop#("+",Bop#("*","j","ldc"),"i")/>
+<define Cij ArrayRef#("C", cij)/>
+<define Aik ArrayRef#("A", "i" * lda + "l")/>
+<define Bkj ArrayRef#("B", "j" * ldb + "l")/>
+<define Arepl="",Brepl="",Crepl=""/>
+
+<trace gemm,gemmDecl,gemmBody,nest3,loopJ,nest2,loopI,nest1,loopL/>
+
+<define alphaA  alpha?Bop#("*","alpha",Aik) : Aik/> 
+<define pcj Bop#("+","C",cij)/>
+<define gemm (pre != "d")? REPLACE("double",ftype, gemm) : gemm/>
+
+
+<define codegen_gemm_kernel 
+   PERMUTE(permuteReg, 
+   <* APPLY A_ScalarRepl; *> 
+   DELAY {
+     dim = ( ("i","i",loopI[Loop.step], lda) ("l","l",loopL[Loop.step], 1));
+     TRACE(Arepl,
+           ScalarRepl[iInit=nest1[Nest.body]; tVars=Arepl; iType=ftype; 
+                      tDecl=gemmDecl; trace=nest1] 
+            ("a_buf",alphaA, "i" * lda + "l", dim, nest1[Nest.body]));
+   }
+
+   <* APPLY nest3_UnrollJam; *>
+   DELAY{
+   if (Crepl == "")
+       UnrollJam[factor=(nu mu);trace=gemmBody] (nest1,nest3); 
+   else PRINT ("Unroll-Jam is disabled because of C_ScalarRepl");
+   }
+
+   <* APPLY B_ScalarRepl; *>
+   DELAY{
+     dim = ( ("j","j",loopJ[Loop.step], ldb) ("l","l",loopL[Loop.step], 1));
+     TRACE (Brepl,
+            ScalarRepl[iInit=nest1[Nest.body]; tVars=Brepl; iType=ftype; 
+                       tDecl=gemmDecl; trace=nest1]
+                ("b_buf",Bkj,Bkj[ArrayRef.sub], dim, nest1[Nest.body]));
+   }
+
+   <* APPLY C_ScalarRepl; *>
+   DELAY{
+    dim = ( ("j","j",loopJ[Loop.step], ldb) ("i","i",loopI[Loop.step], 1));
+    TRACE (Crepl,
+           ScalarRepl[iInit=nest2[Nest.body]; iSave=nest2[Nest.body]; 
+                      tVars=Crepl; iType=ftype; tDecl=gemmDecl; trace=nest2]
+           ("c_buf",Cij, Cij[ArrayRef.sub], dim, nest2[Nest.body]));
+   }
+   )
+
+   DELAY{
+   if (alpha) { <* APPLY Alpha_BufRepl; *>
+       dim = ( ("i",0,"M", lda) ("l",0,"K",1));
+       CopyRepl[iInit=gemmBody;scalar=0;  iType=ftype; tDecl=gemmDecl]
+          ( "alpha_buf",alphaA, "i" * lda + l ,dim, nest3);
+   }
+   }
+
+   <* APPLY Three address translation: Array2Ptr, Abuf_SplitStmt; *>
+   DELAY{
+    if (threeAddress) {
+       ArrayRef2PtrRef(("C" "A" "B" "alpha_buf"),nest3);
+       if (Arepl)  
+          SplitStmt[iReuse=1](Arepl, nest1);
+       if (SSENO && SSELEN) { <* APPLY body2_Vectorize;  *>
+          vars = ( ((("beta",0) (Arepl,1)), "s") (Crepl,0) (Brepl,1));
+          VectorizeCode[iInit="beta"; iRed=Crepl; iAligned=(Arepl Brepl); 
+                    iPre=pre; iRegno=SSENO; iReglen=SSELEN; tIncl=gemm; 
+                    trace=nest2 ]
+              ( vars, nest1, nest2[Nest.body]) ;
+       }
+     }
+   }
+
+
+   PERMUTE(permuteUnroll, 
+   <* APPLY array_FiniteDiff; *>
+   DELAY{
+     if  (nest1 : Nest) {
+        FiniteDiff[iType=("const " ftype "*"); tDecl=gemmDecl;  
+                  tRepl=nest1; tDiff=nest3]
+          ( "pA", "A"+ ("i" * lda + "l"), (nest2 nest1), (1 1), (lda 1), 
+             nest1[Nest.body], nest3[Nest.body]);
+        FiniteDiff[iType=("const " ftype "*"); tDecl=gemmDecl; tRepl=nest1]
+          ( "pB", "B" + ("j" * ldb + "l"), (nest3 nest1),  (1 1), (ldb 1), 
+             nest1[Nest.body], gemmBody);
+     }
+     else {
+        FiniteDiff[iType=("const " ftype "*"); 
+                   iPattern="A"+ ("i"*lda + 1); iVars=1; 
+                   tDecl=gemmDecl; tRepl=nest1; tDiff=nest3]
+          ( "pA", "A"+"i"*lda, nest2, 1, lda, nest1, nest3[Nest.body]);
+        FiniteDiff[iType=("const " ftype "*"); 
+                   iPattern="B"+(1+"j"*ldb); iVars=1; 
+                   tDecl=gemmDecl; tRepl=nest1]
+          ( "pB", "B"+"j"*ldb, nest3,  1, ldb, nest1, gemmBody);
+     }
+     FiniteDiff[ iType=(ftype "*"); tDecl=gemmDecl; tRepl=nest2]
+          ( "pC", pcj, (nest3 nest2), (1 1), ("ldc" 1), 
+             nest2[Nest.body], gemmBody);
+   }
+   <* APPLY nest1_Unroll;  *>
+   DELAY{
+     if (ku >= loopL[Loop.step]* 2) {
+        UnrollLoops[factor=(ku/loopL[Loop.step]); trace=nest2 ]
+          (nest1[Nest.body],nest1) ;
+     }
+   }
+  )
+
+   <* APPLY body2_Prefetch; *>
+   DELAY{
+   if (PF > 0) {
+       Prefetch[tIncl=gemm; iType="const " ftype "*"; tDecl=gemmDecl; 
+                trace=gemmBody] 
+         ( "prefA", "A"+lda*KB, (nest3, nest2[Nest.body]), 
+           loopJ[Loop.step]*loopI[Loop.step], gemmBody);
+       if (PF == 2 || PF == 4) {
+          Prefetch[ iType="const " ftype "*"; tDecl=gemmDecl; 
+                trace=gemmBody] 
+         ( "prefB", "B"+ldb, (nest3,nest3[Nest.body]), ldb, gemmBody);
+       }
+       if (PF == 3 || PF == 4) {
+          Prefetch[ iType="const " ftype "*"; tDecl=gemmDecl; 
+                trace=gemmBody] 
+         ( "prefC", "C"+"ldc", (nest3,nest3[Nest.body]), "ldc", gemmBody);
+       }
+   }
+   }
+
+  />
+
+<output to="dgemm_orig.c" from=gemm/>
+<output to="dgemm_kernel.c" from=(
+   SAVE (gemm);
+   TRACE (gemm,gemm);
+   <* APPLY Specialize; *>
+    if (SP) {
+       REPLACE("N",NB,loopJ); 
+       REPLACE("M",MB,loopI); 
+       REPLACE("K",KB,loopL);
+       REPLACE("lda",KB, gemmBody);
+       REPLACE("ldb",KB, gemmBody);
+       if (alpha == 0) 
+          REBUILD(REPLACE("alpha",1, gemmBody));
+       if (ku > KB)
+         ku = KB;
+   }
+
+   <* APPLY(codegen_gemm_kernel); *>
+   for ((i = 0; opt = codegen_gemm_kernel); opt != ""; (opt = cdr opt; i=i+1)) {
+         APPLY (car opt); 
+   }
+
+   target = COPY gemm;
+   RESTORE(gemm);
+   target
+)/>
+

@@ -1,0 +1,41 @@
+include opt.pi
+<code ArrayAccess match=FunctionCall#("arr_ref",((array subscript)))/>
+<trace target/>
+<input to=target syntax="Cfront.code" from=("rose_dgetrf.C")/>
+<trace top_nest1,decl_top_nest1,nest1,nest3,nest2/>
+<eval INSERT(nest1,target);
+      decl_top_nest1 = "";
+      top_nest1 = (decl_top_nest1 nest1);
+      ModifyTraceHandle[trace=target](nest1,top_nest1)/>
+
+<trace var_tile_nest1/>
+<eval var_clnup_top_nest1 = top_nest1/>
+
+<parameter bsize_nest1 type=(INT INT) default=(16 16) message="Blocking factor for loop nest nest1"/>
+<parameter ujsize_nest1 type=(INT) default=(2) message="Unroll and Jam factor for loop nest nest1"/>
+
+<eval block_nest1 = DELAY{
+         bdim_nest1 = (BlockDim#("k","k_bk",HEAD(bsize_nest1)) BlockDim#("j","j_bk",HEAD(TAIL(bsize_nest1))));
+         var_tile_nest1 = COPY(nest1);
+         AppendDecl(IntegerType,(("j_bk" "k_bk")),decl_top_nest1);
+         BlockLoops[factor=bdim_nest1;trace_innerNest=var_tile_nest1;trace_decl=decl_top_nest1;nonPerfect=NonPerfectLoops#(nest1,((nest3 nest2)))](nest3[Nest.body],nest1)
+      }/>
+
+<eval unrolljam_nest1 = DELAY{
+         ERASE((nest1 nest3 nest2),top_nest1);
+         TraceNest(ERASE(var_tile_nest1),((nest1 nest3)));
+         nest2 = ERASE(nest3);
+         REPLACE(ERASE(nest1),nest1,top_nest1);
+         REPLACE(ERASE(nest3),nest3,top_nest1);
+         REPLACE(ERASE(nest2),nest2,top_nest1);
+         UnrollJam[factor=((HEAD(ujsize_nest1)));trace=top_nest1](nest3,nest1)
+      }/>
+<eval cleanup_nest1 = DELAY{
+         CleanupBlockedNests[trace=top_nest1](var_clnup_top_nest1)
+      }/>
+
+
+<eval APPLY{block_nest1};
+      APPLY{unrolljam_nest1};
+      APPLY{cleanup_nest1}/>
+<output from=(target) syntax=("Cfront.code")/>

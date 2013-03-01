@@ -1,0 +1,18 @@
+
+<parameter inputFile default="" message="input file name" />
+<parameter outputFile default="" message="output file name" />
+< parameter inputString type=(STRING...) default="" message="string to replace" />
+< parameter outputString type=(STRING...) default="" message="string to replace with" />
+
+<input from=inputFile annot=0 to=inputCode/>
+
+<eval 
+return = inputCode;
+for ((p_input = inputString,p_output=outputString); p_input != "";
+      (p_input = TAIL(p_input); p_output=TAIL(p_output)))
+   { return = REPLACE(HEAD(p_input), HEAD(p_output), return);}
+return
+/>
+
+<output to=outputFile from=return/>
+

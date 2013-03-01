@@ -1,0 +1,24 @@
+include opt.pi
+
+<parameter inputFile type=STRING default="" message="input file name" />
+<parameter outputFile type=STRING default="" message="output file name" />
+
+
+<trace inputCode,nest1,nest1_1,nest1_2,nest1_3/>
+<input from=inputFile syntax="Ffront.code" to=inputCode/>
+
+
+<code SingleLoop/>
+
+<eval 
+     SingleLoop#nest1_1=nest1;
+     nest1_2=nest1_1[Nest.body]; 
+     nest1_3=nest1_2[Nest.body];
+     INSERT(nest1,inputCode); 
+
+     UnrollLoops[factor=2;cleanup=1;trace=nest1](nest1_3[Nest.body],nest1_3);
+/>
+
+<output to=outputFile syntax="Ffront.code" from=(inputCode)/>
+
+

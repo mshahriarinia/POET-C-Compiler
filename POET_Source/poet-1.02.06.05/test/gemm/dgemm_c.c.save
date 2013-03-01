@@ -1,0 +1,290 @@
+
+void dgemm_test(const int M,const int N,const int K,const double alpha,const double* A,const int lda,const double* B,const int ldb,const double beta,double* C,const int ldc) 
+{
+   int i,j,l;
+   int i_bk;
+   int j_bk;
+   int l_bk;
+   int i_A_cp_1;
+   int i_A_cp_0;
+   int i_A_cp_bk_1;
+   int i_A_cp_bk_0;
+   double* A_cp_j_ptr;
+   double* A_cp;
+   double* _A_cp_0;
+   double* _A_cp_0_0;
+   int i_B_cp_1;
+   int i_B_cp_0;
+   int i_B_cp_bk_1;
+   int i_B_cp_bk_0;
+   double* B_cp_j_ptr;
+   double* B_cp;
+   double* _B_cp_0;
+   double* _B_cp_0_0;
+   double* _C_0;
+   double* _C_0_0;
+   A_cp=(double*)malloc(60*((59+M)/60)*(60*((59+K)/60)) * sizeof(double));
+   A_cp_j_ptr = A_cp;
+   for (i_A_cp_bk_1=0; i_A_cp_bk_1<-59+M; i_A_cp_bk_1+=60) 
+     {
+        for (i_A_cp_bk_0=0; i_A_cp_bk_0<-59+K; i_A_cp_bk_0+=60) 
+          for (i_A_cp_1=i_A_cp_bk_1; i_A_cp_1<60+i_A_cp_bk_1; i_A_cp_1+=1) 
+            for (i_A_cp_0=i_A_cp_bk_0; i_A_cp_0<60+i_A_cp_bk_0; i_A_cp_0+=1) 
+              *(A_cp_j_ptr++) = alpha*A[i_A_cp_0*lda+i_A_cp_1];
+        if (i_A_cp_bk_0<K)  
+          {
+             for (i_A_cp_1=i_A_cp_bk_1; i_A_cp_1<60+i_A_cp_bk_1; i_A_cp_1+=1) 
+               {
+                  for (i_A_cp_0=i_A_cp_bk_0; i_A_cp_0<K; i_A_cp_0+=1) 
+                    *(A_cp_j_ptr++) = alpha*A[i_A_cp_0*lda+i_A_cp_1];
+                  A_cp_j_ptr = A_cp_j_ptr+(-K+(60+i_A_cp_bk_0));
+               }
+             i_A_cp_bk_0 = 60+i_A_cp_bk_0;
+          }
+     }
+   if (i_A_cp_bk_1<M)  
+     {
+        for (i_A_cp_bk_0=0; i_A_cp_bk_0<-59+K; i_A_cp_bk_0+=60) 
+          {
+             for (i_A_cp_1=i_A_cp_bk_1; i_A_cp_1<M; i_A_cp_1+=1) 
+               for (i_A_cp_0=i_A_cp_bk_0; i_A_cp_0<60+i_A_cp_bk_0; i_A_cp_0+=1) 
+                 *(A_cp_j_ptr++) = alpha*A[i_A_cp_0*lda+i_A_cp_1];
+             A_cp_j_ptr = A_cp_j_ptr+(60*-M+(3600+60*i_A_cp_bk_1));
+          }
+        if (i_A_cp_bk_0<K)  
+          {
+             for (i_A_cp_1=i_A_cp_bk_1; i_A_cp_1<M; i_A_cp_1+=1) 
+               {
+                  for (i_A_cp_0=i_A_cp_bk_0; i_A_cp_0<K; i_A_cp_0+=1) 
+                    *(A_cp_j_ptr++) = alpha*A[i_A_cp_0*lda+i_A_cp_1];
+                  A_cp_j_ptr = A_cp_j_ptr+(-K+(60+i_A_cp_bk_0));
+               }
+             A_cp_j_ptr = A_cp_j_ptr+(60*-M+(3600+60*i_A_cp_bk_1));
+             i_A_cp_bk_0 = 60+i_A_cp_bk_0;
+          }
+        i_A_cp_bk_1 = 60+i_A_cp_bk_1;
+     }
+   B_cp=(double*)malloc(60*((59+N)/60)*(60*((59+K)/60)) * sizeof(double));
+   B_cp_j_ptr = B_cp;
+   for (i_B_cp_bk_1=0; i_B_cp_bk_1<-59+N; i_B_cp_bk_1+=60) 
+     {
+        for (i_B_cp_bk_0=0; i_B_cp_bk_0<-59+K; i_B_cp_bk_0+=60) 
+          for (i_B_cp_1=i_B_cp_bk_1; i_B_cp_1<60+i_B_cp_bk_1; i_B_cp_1+=1) 
+            for (i_B_cp_0=i_B_cp_bk_0; i_B_cp_0<60+i_B_cp_bk_0; i_B_cp_0+=1) 
+              *(B_cp_j_ptr++) = B[i_B_cp_1*ldb+i_B_cp_0];
+        if (i_B_cp_bk_0<K)  
+          {
+             for (i_B_cp_1=i_B_cp_bk_1; i_B_cp_1<60+i_B_cp_bk_1; i_B_cp_1+=1) 
+               {
+                  for (i_B_cp_0=i_B_cp_bk_0; i_B_cp_0<K; i_B_cp_0+=1) 
+                    *(B_cp_j_ptr++) = B[i_B_cp_1*ldb+i_B_cp_0];
+                  B_cp_j_ptr = B_cp_j_ptr+(-K+(60+i_B_cp_bk_0));
+               }
+             i_B_cp_bk_0 = 60+i_B_cp_bk_0;
+          }
+     }
+   if (i_B_cp_bk_1<N)  
+     {
+        for (i_B_cp_bk_0=0; i_B_cp_bk_0<-59+K; i_B_cp_bk_0+=60) 
+          {
+             for (i_B_cp_1=i_B_cp_bk_1; i_B_cp_1<N; i_B_cp_1+=1) 
+               for (i_B_cp_0=i_B_cp_bk_0; i_B_cp_0<60+i_B_cp_bk_0; i_B_cp_0+=1) 
+                 *(B_cp_j_ptr++) = B[i_B_cp_1*ldb+i_B_cp_0];
+             B_cp_j_ptr = B_cp_j_ptr+(60*-N+(3600+60*i_B_cp_bk_1));
+          }
+        if (i_B_cp_bk_0<K)  
+          {
+             for (i_B_cp_1=i_B_cp_bk_1; i_B_cp_1<N; i_B_cp_1+=1) 
+               {
+                  for (i_B_cp_0=i_B_cp_bk_0; i_B_cp_0<K; i_B_cp_0+=1) 
+                    *(B_cp_j_ptr++) = B[i_B_cp_1*ldb+i_B_cp_0];
+                  B_cp_j_ptr = B_cp_j_ptr+(-K+(60+i_B_cp_bk_0));
+               }
+             B_cp_j_ptr = B_cp_j_ptr+(60*-N+(3600+60*i_B_cp_bk_1));
+             i_B_cp_bk_0 = 60+i_B_cp_bk_0;
+          }
+        i_B_cp_bk_1 = 60+i_B_cp_bk_1;
+     }
+   _B_cp_0 = B_cp;
+   _C_0 = C;
+   for (j_bk=0; j_bk<-59+N; j_bk+=60) 
+     {
+        _A_cp_0 = A_cp;
+        _C_0_0 = _C_0;
+        for (i_bk=0; i_bk<-59+M; i_bk+=60) 
+          {
+             if (59<K)  
+               for (j=0; j<60; j+=1) 
+                 for (i=0; i<60; i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             if (K<60)  
+               for (j=0; j<60; j+=1) 
+                 for (i=0; i<60; i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<K; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             _A_cp_0_0 = 3600+_A_cp_0;
+             _B_cp_0_0 = 3600+_B_cp_0;
+             for (l_bk=60; l_bk<-59+K; l_bk+=60) 
+               {
+                  for (j=0; j<60; j+=1) 
+                    for (i=0; i<60; i+=1) 
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             if (l_bk<K)  
+               {
+                  for (j=0; j<60; j+=1) 
+                    for (i=0; i<60; i+=1) 
+                      for (l=0; l<(K+-l_bk); l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             _A_cp_0 = _A_cp_0+60*i_A_cp_bk_0;
+             _C_0_0 = 60+_C_0_0;
+          }
+        if (i_bk<M)  
+          {
+             if (59<K)  
+               for (j=0; j<60; j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             if (K<60)  
+               for (j=0; j<60; j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<K; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             _A_cp_0_0 = 3600+_A_cp_0;
+             _B_cp_0_0 = 3600+_B_cp_0;
+             for (l_bk=60; l_bk<-59+K; l_bk+=60) 
+               {
+                  for (j=0; j<60; j+=1) 
+                    for (i=0; i<(M+-i_bk); i+=1) 
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             if (l_bk<K)  
+               {
+                  for (j=0; j<60; j+=1) 
+                    for (i=0; i<(M+-i_bk); i+=1) 
+                      for (l=0; l<(K+-l_bk); l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             _A_cp_0 = _A_cp_0+60*i_A_cp_bk_0;
+             _C_0_0 = 60+_C_0_0;
+          }
+        _B_cp_0 = _B_cp_0+60*i_B_cp_bk_0;
+        _C_0 = _C_0+60*ldc;
+     }
+   if (j_bk<N)  
+     {
+        _A_cp_0 = A_cp;
+        _C_0_0 = _C_0;
+        for (i_bk=0; i_bk<-59+M; i_bk+=60) 
+          {
+             if (59<K)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<60; i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             if (K<60)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<60; i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<K; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             _A_cp_0_0 = 3600+_A_cp_0;
+             _B_cp_0_0 = 3600+_B_cp_0;
+             for (l_bk=60; l_bk<-59+K; l_bk+=60) 
+               {
+                  for (j=0; j<(N+-j_bk); j+=1) 
+                    for (i=0; i<60; i+=1) 
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             if (l_bk<K)  
+               {
+                  for (j=0; j<(N+-j_bk); j+=1) 
+                    for (i=0; i<60; i+=1) 
+                      for (l=0; l<(K+-l_bk); l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             _A_cp_0 = _A_cp_0+60*i_A_cp_bk_0;
+             _C_0_0 = 60+_C_0_0;
+          }
+        if (i_bk<M)  
+          {
+             if (59<K)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             if (K<60)  
+               for (j=0; j<(N+-j_bk); j+=1) 
+                 for (i=0; i<(M+-i_bk); i+=1) 
+                   {
+                      _C_0_0[j*ldc+i] = beta*_C_0_0[j*ldc+i];
+                      for (l=0; l<K; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0[l+60*i]*_B_cp_0[l+60*j];
+                   }
+             _A_cp_0_0 = 3600+_A_cp_0;
+             _B_cp_0_0 = 3600+_B_cp_0;
+             for (l_bk=60; l_bk<-59+K; l_bk+=60) 
+               {
+                  for (j=0; j<(N+-j_bk); j+=1) 
+                    for (i=0; i<(M+-i_bk); i+=1) 
+                      for (l=0; l<60; l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             if (l_bk<K)  
+               {
+                  for (j=0; j<(N+-j_bk); j+=1) 
+                    for (i=0; i<(M+-i_bk); i+=1) 
+                      for (l=0; l<(K+-l_bk); l+=1) 
+                        _C_0_0[j*ldc+i] = _C_0_0[j*ldc+i]+_A_cp_0_0[60*i+l]*_B_cp_0_0[60*j+l];
+                  _A_cp_0_0 = 3600+_A_cp_0_0;
+                  _B_cp_0_0 = 3600+_B_cp_0_0;
+               }
+             _A_cp_0 = _A_cp_0+60*i_A_cp_bk_0;
+             _C_0_0 = 60+_C_0_0;
+          }
+        _B_cp_0 = _B_cp_0+60*i_B_cp_bk_0;
+        _C_0 = _C_0+60*ldc;
+     }
+   free(B_cp);
+   free(A_cp);
+}

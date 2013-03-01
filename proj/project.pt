@@ -1,0 +1,266 @@
+<* Project by Morteza Shahriari Nia *>
+
+<* 
+check for dual duplication
+add a function to add an arrayId to symbolTable
+leveled symbolTable
+check use after initialization 
+*>
+
+<parameter inputFile type=STRING />
+<parameter syntaxFile type=STRING />
+<input to=inputAST from=inputFile syntax=syntaxFile />
+
+
+<xform traverse />
+<xform traverseDeclaratorIdListItem />
+<xform addVarToSymbolTable />
+<xform traverseStmtList />
+<xform typeCheckExpr />
+
+<xform deleteOutScopeVariables />
+
+<xform lookupVariable />
+
+
+
+<eval
+
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+
+	PRINT inputAST;
+
+	
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "---------------------Start Traverse For Symbol Table----------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	
+	symbolTable = MAP(STRING, STRING);
+	blockIndex = 0;
+	traverseStmtList(inputAST, symbolTable, blockIndex);
+
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "------------------------------Symbol Table--------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+	PRINT "--------------------------------------------------------------------------------";
+
+	PRINT symbolTable;
+
+/>
+
+
+<xform traverse pars=(inputAST, symbolTable, blockIndex)>
+
+PRINT (inputAST);
+
+switch(inputAST){
+		case CODE.DeclaratorStmt#(v1) : 
+			traverse(v1, symbolTable, blockIndex);
+		case CODE.Declarator#(type, declaratorIdList) : 
+			traverseDeclaratorIdListItem(type, declaratorIdList, symbolTable, blockIndex);
+		case CODE.BlockedStmts#(v1) :
+			traverseStmtList(v1, symbolTable, blockIndex + 1);
+			deleteOutScopeVariables(symbolTable, blockIndex + 1);
+		case CODE.IfStmtWithElse#(expr, stmtIf, stmtElse) : 
+			typeCheckExpr(expr, symbolTable, blockIndex);
+			traverse(stmtIf, symbolTable, blockIndex + 1);
+			deleteOutScopeVariables(symbolTable, blockIndex + 1);
+			traverse(stmtElse, symbolTable, blockIndex + 1);
+			deleteOutScopeVariables(symbolTable, blockIndex  + 1);
+		case CODE.IfStmtWithoutElse#(expr, stmt): 
+			typeCheckExpr(expr, symbolTable, blockIndex);
+			traverse(stmt, symbolTable, blockIndex + 1);
+			deleteOutScopeVariables(symbolTable, blockIndex + 1);
+		case CODE.WhileStmt#(expr, stmt) :
+			typeCheckExpr(expr, symbolTable, blockIndex);
+			traverse(stmt, symbolTable, blockIndex + 1);
+			deleteOutScopeVariables(symbolTable, blockIndex + 1);
+		case CODE.NullStmt : 
+			"";
+		case CODE.ExprStmt#(expr) : 
+			typeCheckExpr(expr, symbolTable, blockIndex);
+		default : 
+			ERROR("----------XXX----------No Match"^inputAST);
+	}
+</xform>
+
+<xform traverseStmtList pars=(stmtList, symbolTable, blockIndex)>
+    	for (temp_stmt=stmtList; temp_stmt != ""; temp_stmt=TAIL(temp_stmt)){
+		traverse(HEAD(temp_stmt), symbolTable, blockIndex);
+	}
+</xform>
+
+<xform typeCheckExpr pars=(exprParameter, symbolTable, blockIndex) >
+	INT_TYPE = "int";
+	FLOAT_TYPE = "float";
+	PRINT ("in typeCheckExpr"^exprParameter);
+
+	returnType = "";
+	switch(exprParameter){
+		case CODE.Uop#(op, opd1):
+			PRINT ("Was Uop "^exprParameter);
+			if(op == "!"){
+				typeCheckExpr(opd1, symbolTable, blockIndex);
+				returnType = INT_TYPE;
+			}else if (op == "-" || op == "+"){
+				returnType = typeCheckExpr(opd1, symbolTable, blockIndex);				
+			}
+		case CODE.Bop#(op, opd1, opd2):
+			PRINT ("Was Bop "^exprParameter);
+			if(op == "||" || op == "&&"){
+				type1 = typeCheckExpr(opd1, symbolTable, blockIndex);
+				type2 = typeCheckExpr(opd2, symbolTable, blockIndex);
+				PRINT ("TYPES||&&:: "^type1""^type2);
+				returnType = INT_TYPE;
+			} 
+			if(op == "+" || op == "-" || op == "/" || op == "*"){
+				type1 = typeCheckExpr(opd1, symbolTable, blockIndex);
+				type2 = typeCheckExpr(opd2, symbolTable, blockIndex);
+				PRINT ("TYPES+-*/:: "^type1""^type2);
+				if(type1 == INT_TYPE && type2 == INT_TYPE)
+					returnType = INT_TYPE;
+				else if((type1 == INT_TYPE && type2 == FLOAT_TYPE) ||
+					(type1 == FLOAT_TYPE && type2 == INT_TYPE) ||
+					(type1 == FLOAT_TYPE && type2 == FLOAT_TYPE)){
+						returnType = FLOAT_TYPE;
+				}else
+					ERROR("----------XXX----------Invalid Type: "exprParameter^" WITH SUBTYPES : TYPE1: "type1^" and TYPE2: "^type2);
+			}
+		case CODE.RationalityExpr1#(opd1, op, opd2):
+			PRINT ("Was Rationality "^exprParameter);
+			typeCheckExpr(opd1, symbolTable, blockIndex);
+			typeCheckExpr(opd2, symbolTable, blockIndex);
+			returnType = INT_TYPE;
+		case CODE.AssignmentExpr#(arrayId, v1) : 
+			type1 = typeCheckExpr(v1, symbolTable, blockIndex);
+			type2 = lookupVariable(arrayId, symbolTable, blockIndex);
+			if(type1 == FLOAT_TYPE && type2 != FLOAT_TYPE){				
+				ERROR("----------XXX----------Invalid Type: " exprParameter " WITH ASSIGNMENT SUBTYPES : TYPE: "type1" and TYPE1: "type2);
+			}
+		case CODE.ArrayId#(id, v1):			
+			temp = lookupVariable(exprParameter, symbolTable, blockIndex);
+			PRINT ("Was ArrayId TYPE = "^returnType^" "^exprParameter);	
+			returnType = temp
+		case INT:
+			PRINT ("Was INT "^exprParameter);
+			returnType = INT_TYPE;
+		case CODE.FloatLiteral#(content):
+			PRINT ("Was float "^exprParameter);
+			returnType = FLOAT_TYPE;
+	}
+PRINT("---------- at typeCheckExpr: ");
+returnType 
+</xform>
+
+<xform lookupVariable pars=(arrayId, symbolTable, blockIndex) output=(returnType)>
+	PRINT ("IN lookupVariable"^arrayId);
+	PRINT blockIndex;
+	PRINT symbolTable;	
+	
+	alreadyExists = "";
+	switch(arrayId){
+		case CODE.ArrayId#(id, v1) : 
+			for(i = blockIndex; i >= 0; i = i - 1){
+				var = id^"_$$_NestedBlockIndex("^i^")_$$_";
+				PRINT("var = "var);
+				temp = symbolTable[var];
+				if(temp !="")
+					alreadyExists = temp;			
+			}	
+	}
+	if(alreadyExists == "")
+		ERROR("----------XXX----------Variable does not exist : "^arrayId);
+	PRINT ("IN lookupVariable TYPE = "^alreadyExists);
+	alreadyExists
+</xform>
+
+
+<xform traverseDeclaratorIdListItem pars=(type, declaratorIdListItem, symbolTable, blockIndex)>
+	INT_TYPE = "int";
+	FLOAT_TYPE = "float";
+	switch(declaratorIdListItem){
+		case CODE.DeclaratorIdListUninitializedItem#(arrayId, v1) : 
+			addVarToSymbolTable(type, arrayId, symbolTable, blockIndex);
+			traverseDeclaratorIdListItem(type, v1, symbolTable, blockIndex);
+		case CODE.DeclaratorIdListInitializedItem#(assignmentExpr, v1) :			
+			switch(assignmentExpr){
+				case CODE.AssignmentExpr#(arrayId, v2) :
+					typeCheckExpr(v2, symbolTable, blockIndex);
+					addVarToSymbolTable(type, arrayId, symbolTable, blockIndex);
+			}			
+			traverseDeclaratorIdListItem(type, v1, symbolTable, blockIndex);		
+		case CODE.AssignmentExpr#(arrayId, v1) : 
+			type1 = typeCheckExpr(v1, symbolTable, blockIndex);
+			if(type1 == FLOAT_TYPE && type != FLOAT_TYPE)
+				ERROR("----------XXX----------Invalid Type: "^declaratorIdListItem" WITH ASSIGNMENT SUBTYPES IN DECLARATION : TYPE: "type^" and TYPE1: "^type1);
+			else
+				addVarToSymbolTable(type, arrayId, symbolTable, blockIndex);
+		case CODE.ArrayId#(id, v1) : 
+			addVarToSymbolTable(type, declaratorIdListItem, symbolTable, blockIndex);
+	}
+</xform>
+
+<*id, blockindex --> indexcount, type*>
+<xform addVarToSymbolTable pars=(type, arrayId, symbolTable, blockIndex)>
+	switch(arrayId){ <*extract index from id*>
+		case CODE.ArrayId#(id, v1) : 
+			alreadyExists = symbolTable[id^"_$$_NestedBlockIndex("^blockIndex^")_$$_"];
+			if(alreadyExists != ""){
+				ERROR("----------XXX----------Variable already exists : "^arrayId);		
+			} else
+				symbolTable[id^"_$$_NestedBlockIndex("^blockIndex^")_$$_"] = type;
+	}
+</xform>
+
+<xform deleteOutScopeVariables pars=(symbolTable, blockIndex)>
+PRINT ("START deleteOutScopeVariables");
+	foreach(symbolTable : (CLEAR from, CLEAR to) : FALSE) {
+		PRINT ("deleteOutScopeVariables"^from^""^blockIndex);
+		splitVar = "_$$_NestedBlockIndex("^blockIndex^")_$$_";	
+		
+		fromCopy = from;
+		split = SPLIT(splitVar, fromCopy);
+		
+		len = LEN(split);
+		
+		if(len == 2){
+			PRINT("MATCHEDS"^from);
+			symbolTable[from] = "";
+		}
+	}
+</xform>
+
+
+

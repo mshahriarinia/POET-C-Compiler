@@ -1,0 +1,45 @@
+include utils.incl
+
+<define PARSE CODE.CommandList/>
+
+<code CommandList pars=(content:LIST(CODE.ParamDecl|CODE.ThrowAway, "\n"))>
+@content@
+</code>
+
+<code ThrowAway pars=(anything:_) rebuild=""> @anything@ </code>
+
+<code ParamDecl pars=(param:CODE.NumOfThreads|CODE.ParBlockFactor
+                  |CODE.BlockFactor|CODE.UnrollJamFactor|CODE.UnrollFactor
+                  |CODE.CopyArrayConfig|CODE.ScalarReplConfig)>
+<parameter @param@/>
+</code>
+
+<code NumOfThreads pars=(parName:Name, loopNest:Name, defval:INT)>
+@parName@ type=1.._ default=@defval@ message="number of threads to parallelize loop @loopNest@"
+</code>
+
+<code ParBlockFactor pars=(parName:Name, loopNest:Name, defval:INT)>
+@parName@ type=1.._ default=@defval@ message="number of loop iterations to run by different threads for @loopNest@"
+</code>
+
+<code BlockDimList pars=(spec:LIST("INT"," ")) rebuild=((spec:STRING)?1:LEN(spec))> @spec@ </code> 
+
+<code BlockFactor pars=(parName:Name, loopNest:Name, dim:BlockDimList, defval:LIST(INT," "))>
+@parName@ type=(@dim@) default=(@defval@) message="Blocking factor for loop nest @loopNest@"
+</code>
+
+<code UnrollJamFactor pars=(parName:Name, loopNest:Name, dim:BlockDimList, defval:LIST(INT," "))>
+@parName@ type=(@dim@) default=(@defval@) message="Unroll and Jam factor for loop nest @loopNest@"
+</code>
+
+<code UnrollFactor pars=(parName:Name, loopNest:Name, defval:LIST(INT," "))>
+@parName@ type=1.._ default=@defval@ message="Unroll factor for loop @loopNest@"
+</code>
+
+<code CopyArrayConfig pars=(parName:Name, loopNest:Name, arrayName:Name, defval:INT)>
+@parName@ type=0..2 default=@defval@ message="configuration for copy array @arrayName@ at loop @loopNest@: 0-no opt; 1-copy; 2-strength reduction."
+</code>
+
+<code ScalarReplConfig pars=(parName:Name, loopNest:Name, arrayName:Name, defval:INT)>
+@parName@ type=0..2 default=@defval@ message="configuration for scalarRepl array @arrayName@ at loop @loopNest@: 0-no opt; 1-scalarRepl; 2-strength reduction."
+</code>

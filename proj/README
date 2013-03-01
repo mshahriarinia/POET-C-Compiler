@@ -1,0 +1,54 @@
+INFORMATION
+
+Author: Morteza Shahriari Nia, Student Id: @01251777
+Date: 18 Oct. 2010
+Compiler Project 1.
+Dr. Qing Yi
+
+
+Implemented in POET. To RUN:  call "make" in the terminal in the directory:
+	project1\$ make
+
+It assumes pcg is in the $PATH of the system. To feed your own test files to the parser modify the input variable in the make file.
+
+
+
+
+
+What it could do? 
+	- List of statements
+		- Null statement (;)
+		- Expression as a statement (a+2;)
+		- Assigment statements (a = 2)
+		- Variable declaration statements (int a[10][b])
+		- Blocked statements (statements enclosed in curly braces) ({a = 9; b=5;})
+		- If statement w/o else 
+		- While loop
+	- Expressions
+		-Precedence preserving binary operators (+-*/)
+		-Arrays and array indices
+		-Nested parentheses
+		
+
+What it could not do?
+	- Float numerals
+	- Boolean expressions (> ! < >= ==)
+
+
+
+	
+
+FILES
+- Makefile
+- proj1.pt: driver
+- C.code: grammar, lex -- Cfront.code, ExpStmt.incl
+- test1.c, test2.c, ... : INPUT files
+- Output: prints Pars tree
+
+
+
+
+
+
+
+

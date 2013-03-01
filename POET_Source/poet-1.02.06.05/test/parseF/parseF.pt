@@ -1,0 +1,11 @@
+include ExpStmt.incl
+
+<parameter inputFile default="" message="input file name" />
+<parameter outputFile default="" message="output file name" />
+
+<input from=inputFile syntax="Ffront.code" parse=NoParse to=inputCode/>
+
+<eval PRINT(inputCode)/>
+
+<output syntax="Ffront.code" from=(StmtList#inputCode) to=outputFile/>
+
